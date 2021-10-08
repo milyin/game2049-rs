@@ -1,0 +1,9 @@
+[package]
+name = "game2049-rs"
+version = "0.1.0"
+edition = "2018"
+authors = ["Michael Ilyin <milyin@gmail.com>"]
+
+[dependencies]
+bindings = { path = "bindings" }
+windows = "0.21.1"
