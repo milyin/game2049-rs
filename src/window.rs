@@ -9,8 +9,9 @@ use bindings::Windows::{
         UI::WindowsAndMessaging::{
             AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, GetClientRect, LoadCursorW,
             PostQuitMessage, RegisterClassW, ShowWindow, CREATESTRUCTW, CW_USEDEFAULT,
-            GWLP_USERDATA, HMENU, IDC_ARROW, SW_SHOW, WINDOW_LONG_PTR_INDEX, WM_NCCREATE, WM_SIZE,
-            WM_SIZING, WNDCLASSW, WS_EX_NOREDIRECTIONBITMAP, WS_OVERLAPPEDWINDOW,
+            GWLP_USERDATA, HMENU, IDC_ARROW, SW_SHOW, WINDOW_LONG_PTR_INDEX, WM_DESTROY,
+            WM_LBUTTONDOWN, WM_MOUSEMOVE, WM_NCCREATE, WM_RBUTTONDOWN, WM_SIZE, WM_SIZING,
+            WNDCLASSW, WS_EX_NOREDIRECTIONBITMAP, WS_OVERLAPPEDWINDOW,
         },
     },
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
