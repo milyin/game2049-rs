@@ -1,0 +1,46 @@
+{
+    // Используйте IntelliSense, чтобы узнать о возможных атрибутах.
+    // Наведите указатель мыши, чтобы просмотреть описания существующих атрибутов.
+    // Для получения дополнительной информации посетите: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Debug executable 'game2049-rs'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=game2049-rs",
+                    "--package=game2049-rs"
+                ],
+                "filter": {
+                    "name": "game2049-rs",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/target/debug/game2049-rs.exe"
+        },
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'game2049-rs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=game2049-rs",
+                    "--package=game2049-rs"
+                ],
+                "filter": {
+                    "name": "game2049-rs",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -3,7 +3,11 @@ mod wide_strings;
 mod window;
 use bindings::Windows::{
     Foundation::Numerics::Vector2,
-    Win32::System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
+    Win32::{
+        Foundation::HWND,
+        System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
+        UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG},
+    },
     UI::Composition::Compositor,
 };
 use interop::create_dispatcher_queue_controller_for_current_thread;
@@ -28,6 +32,14 @@ fn run() -> windows::Result<()> {
     let window = Window::new("2048-rs", window_width, window_height)?;
     let target = window.create_window_target(&compositor, false)?;
     target.SetRoot(&root)?;
+
+    let mut message = MSG::default();
+    unsafe {
+        while GetMessageW(&mut message, HWND(0), 0, 0).into() {
+            TranslateMessage(&mut message);
+            DispatchMessageW(&mut message);
+        }
+    }
 
     Ok(())
 }
