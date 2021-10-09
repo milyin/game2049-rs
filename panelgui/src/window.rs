@@ -1,3 +1,8 @@
+use std::{
+    hash::Hasher,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
+
 use async_object::{Keeper, Tag};
 use bindings::{
     Microsoft::Graphics::Canvas::{CanvasDevice, UI::Composition::CanvasComposition},
@@ -29,11 +34,12 @@ impl Window {
             composition_graphics_device,
         })
     }
-    fn set_window_size(&mut self, size: Vector2) -> crate::Result<()> {
+    pub fn set_window_size(&mut self, size: Vector2) -> crate::Result<()> {
         Ok(self.root_visual.SetSize(size)?)
     }
 }
 
+#[derive(Clone)]
 pub struct WindowKeeper {
     keeper: Keeper<Window>,
     compositor: Compositor,
@@ -41,24 +47,37 @@ pub struct WindowKeeper {
 }
 impl WindowKeeper {
     pub fn new() -> crate::Result<Self> {
-        let globals = Window::new()?;
-        let compositor = globals.compositor.clone();
-        let root_visual = globals.root_visual.clone();
-        let keeper = Keeper::new(globals);
+        let window = Window::new()?;
+        let compositor = window.compositor.clone();
+        let root_visual = window.root_visual.clone();
+        let keeper = Keeper::new(window);
         Ok(Self {
             keeper,
             compositor,
             root_visual,
         })
     }
-    pub fn handle(&self) -> WindowTag {
+    pub fn tag(&self) -> WindowTag {
         WindowTag {
             tag: self.keeper.tag(),
             compositor: self.compositor.clone(),
             root_visual: self.root_visual.clone(),
         }
     }
+    pub fn get(&self) -> RwLockReadGuard<'_, Window> {
+        self.keeper.get()
+    }
+    pub fn get_mut(&self) -> RwLockWriteGuard<'_, Window> {
+        self.keeper.get_mut()
+    }
 }
+
+impl AsRef<Arc<RwLock<Window>>> for WindowKeeper {
+    fn as_ref(&self) -> &Arc<RwLock<Window>> {
+        self.keeper.as_ref()
+    }
+}
+
 #[derive(Clone)]
 pub struct WindowTag {
     tag: Tag<Window>,

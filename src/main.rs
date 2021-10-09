@@ -28,12 +28,14 @@ fn run() -> panelgui::Result<()> {
         Y: window_height as f32,
     };
 
-    let kglobals = WindowKeeper::new()?;
-    let hglobals = kglobals.handle();
+    let window_obj = WindowKeeper::new()?;
+    let window_tag = window_obj.tag();
+
+    window_obj.get_mut().set_window_size(window_size)?;
 
     let window = Window::new("2049-rs", window_width, window_height)?;
-    let target = window.create_window_target(hglobals.compositor(), false)?;
-    target.SetRoot(hglobals.root_visual())?;
+    let target = window.create_window_target(window_tag.compositor(), false)?;
+    target.SetRoot(window_tag.root_visual())?;
 
     let mut message = MSG::default();
     unsafe {
