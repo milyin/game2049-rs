@@ -10,7 +10,7 @@ fn main() {
             CompositionColorBrush, CompositionContainerShape, CompositionEllipseGeometry,
             CompositionNineGridBrush, CompositionScopedBatch, CompositionShapeCollection,
             CompositionSpriteShape, Compositor, ShapeVisual, SpriteVisual,
-            Vector3KeyFrameAnimation, VisualCollection,
+            Vector3KeyFrameAnimation, VisualCollection, ContainerVisual
         },
         Windows::Win32::Foundation::{
             RECT, BOOL, HINSTANCE, LRESULT, E_FAIL, E_HANDLE, HWND, WPARAM,
@@ -24,5 +24,9 @@ fn main() {
             SetWindowLongW, SetWindowLongPtrW, GetWindowLongW, GetWindowLongPtrW, PostQuitMessage,
         },
         Windows::Win32::System::LibraryLoader::GetModuleHandleW,
+        Microsoft::Graphics::Canvas::CanvasDrawingSession,
+        Microsoft::Graphics::Canvas::CanvasDevice,
+        Microsoft::Graphics::Canvas::Text::*,
+        Microsoft::Graphics::Canvas::UI::Composition::*,
     };
 }

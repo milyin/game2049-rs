@@ -1,0 +1,9 @@
+[package]
+name = "panelgui"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+async_object = { git = "https://github.com/milyin/async-object" }
+bindings = { path = "../bindings" }
+windows = "0.21.1"

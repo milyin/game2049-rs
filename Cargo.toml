@@ -6,4 +6,5 @@ authors = ["Michael Ilyin <milyin@gmail.com>"]
 
 [dependencies]
 bindings = { path = "bindings" }
+panelgui = { path = "panelgui" }
 windows = "0.21.1"

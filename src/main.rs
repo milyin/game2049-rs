@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod interop;
 mod wide_strings;
 mod window;
@@ -11,9 +13,10 @@ use bindings::Windows::{
     UI::Composition::Compositor,
 };
 use interop::create_dispatcher_queue_controller_for_current_thread;
+use panelgui::WindowKeeper;
 use window::Window;
 
-fn run() -> windows::Result<()> {
+fn run() -> panelgui::Result<()> {
     unsafe { RoInitialize(RO_INIT_SINGLETHREADED)? };
     let _controler = create_dispatcher_queue_controller_for_current_thread()?;
 
@@ -25,13 +28,12 @@ fn run() -> windows::Result<()> {
         Y: window_height as f32,
     };
 
-    let compositor = Compositor::new()?;
-    let root = compositor.CreateContainerVisual()?;
-    root.SetRelativeSizeAdjustment(Vector2::new(1.0, 1.0))?;
+    let kglobals = WindowKeeper::new()?;
+    let hglobals = kglobals.handle();
 
-    let window = Window::new("2048-rs", window_width, window_height)?;
-    let target = window.create_window_target(&compositor, false)?;
-    target.SetRoot(&root)?;
+    let window = Window::new("2049-rs", window_width, window_height)?;
+    let target = window.create_window_target(hglobals.compositor(), false)?;
+    target.SetRoot(hglobals.root_visual())?;
 
     let mut message = MSG::default();
     unsafe {
@@ -49,6 +51,10 @@ fn main() {
 
     // We do this for nicer HRESULT printing when errors occur.
     if let Err(error) = result {
-        error.code().unwrap();
+        match error {
+            // TODO - trace stack with error-chain
+            panelgui::Error::AsyncObjectDestroyed => println!("access to tag of destroyed object"),
+            panelgui::Error::Windows(error) => error.code().unwrap(),
+        }
     }
 }
