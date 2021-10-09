@@ -8,3 +8,4 @@ authors = ["Michael Ilyin <milyin@gmail.com>"]
 bindings = { path = "bindings" }
 panelgui = { path = "panelgui" }
 windows = "0.21.1"
+futures = "0.3.17"

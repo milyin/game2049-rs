@@ -1,17 +1,14 @@
-use std::{
-    hash::Hasher,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{Keeper, Tag};
 use bindings::{
     Microsoft::Graphics::Canvas::{CanvasDevice, UI::Composition::CanvasComposition},
     Windows::{
         Foundation::Numerics::Vector2,
-        Win32::Graphics::Gdi::HGDIOBJ,
         UI::Composition::{CompositionGraphicsDevice, Compositor, ContainerVisual},
     },
 };
+use futures::executor::LocalSpawner;
 
 pub struct Window {
     compositor: Compositor,
@@ -27,6 +24,9 @@ impl Window {
         let root_visual = compositor.CreateContainerVisual()?;
         let composition_graphics_device =
             CanvasComposition::CreateCompositionGraphicsDevice(&compositor, &canvas_device)?;
+
+        let background_shape = compositor.CreateShapeVisual()?;
+
         Ok(Self {
             compositor,
             root_visual,
@@ -42,16 +42,18 @@ impl Window {
 #[derive(Clone)]
 pub struct WindowKeeper {
     keeper: Keeper<Window>,
+    spawner: LocalSpawner,
     compositor: Compositor,
     root_visual: ContainerVisual,
 }
 impl WindowKeeper {
-    pub fn new() -> crate::Result<Self> {
+    pub fn new(spawner: LocalSpawner) -> crate::Result<Self> {
         let window = Window::new()?;
         let compositor = window.compositor.clone();
         let root_visual = window.root_visual.clone();
         let keeper = Keeper::new(window);
         Ok(Self {
+            spawner,
             keeper,
             compositor,
             root_visual,
@@ -60,6 +62,7 @@ impl WindowKeeper {
     pub fn tag(&self) -> WindowTag {
         WindowTag {
             tag: self.keeper.tag(),
+            spawner: self.spawner.clone(),
             compositor: self.compositor.clone(),
             root_visual: self.root_visual.clone(),
         }
@@ -81,6 +84,7 @@ impl AsRef<Arc<RwLock<Window>>> for WindowKeeper {
 #[derive(Clone)]
 pub struct WindowTag {
     tag: Tag<Window>,
+    spawner: LocalSpawner,
     compositor: Compositor,
     root_visual: ContainerVisual,
 }
@@ -92,10 +96,10 @@ impl WindowTag {
     pub fn root_visual(&self) -> &ContainerVisual {
         &self.root_visual
     }
+    pub fn spawner(&self) -> &LocalSpawner {
+        &self.spawner
+    }
     pub async fn set_window_size(&self, size: Vector2) -> crate::Result<()> {
-        self.tag
-            .call_mut(|g| g.set_window_size(size))
-            .await
-            .unwrap_or(Result::Err(crate::Error::AsyncObjectDestroyed))
+        self.tag.async_call_mut(|g| g.set_window_size(size)).await?
     }
 }
