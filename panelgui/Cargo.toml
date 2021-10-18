@@ -8,3 +8,4 @@ async_object = { git = "https://github.com/milyin/async-object" }
 bindings = { path = "../bindings" }
 windows = "0.21.1"
 futures = "0.3.17"
+thiserror = "1.0"

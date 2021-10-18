@@ -1,11 +1,26 @@
-mod background;
-mod window;
+// mod background;
+// mod cell;
+mod frame;
+// mod ribbon;
+mod slot;
 
-use bindings::Windows::Foundation::Numerics::Vector2;
-pub use window::{Window, WindowKeeper, WindowTag};
+use async_object::EventStream;
+use bindings::Windows::{Foundation::Numerics::Vector2, UI::Composition::Visual};
+// pub use cell::{Cell, CellKeeper, CellTag};
+pub use frame::{Frame, FrameKeeper, FrameTag};
+use futures::task::SpawnError;
+// pub use ribbon::{Ribbon, RibbonKeeper, RibbonTag};
+use thiserror::Error;
 
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("Bad element index")]
+    BadIndex,
+    #[error(transparent)]
+    Spawn(SpawnError),
+    #[error(transparent)]
     AsyncObject(async_object::Error),
+    #[error(transparent)]
     Windows(windows::Error),
 }
 
@@ -22,8 +37,8 @@ impl From<async_object::Error> for Error {
         Error::AsyncObject(e)
     }
 }
-
-pub trait Panel {
-    fn set_position(position: Vector2) -> crate::Result<()>;
-    fn set_size(size: Vector2) -> crate::Result<()>;
+impl From<SpawnError> for Error {
+    fn from(e: SpawnError) -> Self {
+        Error::Spawn(e)
+    }
 }

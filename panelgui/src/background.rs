@@ -1,6 +1,6 @@
 use bindings::Windows::UI::Composition::{ContainerVisual, ShapeVisual};
 
-use crate::WindowTag;
+use crate::FrameTag;
 
 struct Background {
     container: ContainerVisual,
@@ -8,7 +8,7 @@ struct Background {
 }
 
 impl Background {
-    fn new(window: WindowTag) -> crate::Result<Self> {
+    fn new(window: FrameTag) -> crate::Result<Self> {
         let compositor = window.compositor();
         let container = compositor.CreateContainerVisual()?;
         let shape = compositor.CreateShapeVisual()?;

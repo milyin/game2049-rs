@@ -16,6 +16,7 @@ use bindings::Windows::{
     },
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
 };
+use panelgui::FrameTag;
 use windows::{Handle, Interface};
 
 use crate::wide_strings::ToWide;
@@ -25,10 +26,16 @@ static WINDOW_CLASS_NAME: &str = "game2049-rs.Window";
 
 pub struct Window {
     handle: HWND,
+    frame: FrameTag,
 }
 
 impl Window {
-    pub fn new(title: &str, width: u32, height: u32) -> windows::Result<Box<Self>> {
+    pub fn new(
+        title: &str,
+        width: u32,
+        height: u32,
+        frame: FrameTag,
+    ) -> windows::Result<Box<Self>> {
         let class_name = WINDOW_CLASS_NAME.to_wide();
         let instance = unsafe { GetModuleHandleW(PWSTR(std::ptr::null_mut())).ok()? };
         REGISTER_WINDOW_CLASS.call_once(|| {
@@ -60,7 +67,10 @@ impl Window {
             (rect.right - rect.left, rect.bottom - rect.top)
         };
 
-        let mut result = Box::new(Self { handle: HWND(0) });
+        let mut result = Box::new(Self {
+            handle: HWND(0),
+            frame,
+        });
 
         let title = title.to_wide();
         let window = unsafe {
@@ -122,7 +132,7 @@ impl Window {
                     X: new_size.Width as f32,
                     Y: new_size.Height as f32,
                 };
-                // self.game.on_parent_size_changed(&new_size).unwrap();
+                self.frame.set_size(new_size);
             }
             WM_LBUTTONDOWN => {
                 // self.game.on_pointer_pressed(false, false).unwrap();
