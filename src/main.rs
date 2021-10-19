@@ -29,7 +29,7 @@ fn run() -> panelgui::Result<()> {
         Y: window_height as f32,
     };
 
-    let mut pool = LocalPool::new();
+    let pool = LocalPool::new();
 
     let frame_keeper = FrameKeeper::new(pool.spawner())?;
     let frame = frame_keeper.tag();
@@ -38,7 +38,7 @@ fn run() -> panelgui::Result<()> {
     let slot = frame.open_modal_slot()?;
     let _background = BackgroundKeeper::new(&frame, slot, Colors::White()?, false)?;
 
-    let window = Window::new("2049-rs", window_width, window_height, frame)?;
+    let window = Window::new("2049-rs", window_width, window_height, pool, frame)?;
     let target = window.create_window_target(frame_keeper.compositor(), false)?;
     target.SetRoot(frame_keeper.root_visual())?;
 
@@ -47,7 +47,6 @@ fn run() -> panelgui::Result<()> {
         while GetMessageW(&mut message, HWND(0), 0, 0).into() {
             TranslateMessage(&mut message);
             DispatchMessageW(&mut message);
-            pool.run_until_stalled();
         }
     }
 

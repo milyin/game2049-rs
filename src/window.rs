@@ -16,6 +16,7 @@ use bindings::Windows::{
     },
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
 };
+use futures::executor::LocalPool;
 use panelgui::FrameTag;
 use windows::{Handle, Interface};
 
@@ -27,6 +28,7 @@ static WINDOW_CLASS_NAME: &str = "game2049-rs.Window";
 pub struct Window {
     handle: HWND,
     frame: FrameTag,
+    pool: LocalPool,
 }
 
 impl Window {
@@ -34,6 +36,7 @@ impl Window {
         title: &str,
         width: u32,
         height: u32,
+        pool: LocalPool,
         frame: FrameTag,
     ) -> windows::Result<Box<Self>> {
         let class_name = WINDOW_CLASS_NAME.to_wide();
@@ -70,6 +73,7 @@ impl Window {
         let mut result = Box::new(Self {
             handle: HWND(0),
             frame,
+            pool,
         });
 
         let title = title.to_wide();
@@ -142,6 +146,7 @@ impl Window {
             }
             _ => {}
         }
+        self.pool.run_until_stalled();
         unsafe { DefWindowProcW(self.handle, message, wparam, lparam) }
     }
 

@@ -5,7 +5,7 @@ use bindings::Windows::{Foundation::Numerics::Vector2, UI::Composition::Containe
 
 use crate::FrameTag;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Size(Vector2);
 
 impl Size {
@@ -58,8 +58,10 @@ impl SlotKeeper {
     pub fn container(&self) -> &ContainerVisual {
         &self.container
     }
-    pub fn send_size(&self, size: Size) {
-        self.keeper.send_event(size)
+    pub fn send_size(&self, size: Size) -> crate::Result<()> {
+        self.container().SetSize(size.as_ref())?;
+        self.keeper.send_event(size);
+        Ok(())
     }
 }
 
