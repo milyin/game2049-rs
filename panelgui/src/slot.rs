@@ -1,10 +1,7 @@
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{EventStream, Keeper, Tag};
-use bindings::Windows::{
-    Foundation::Numerics::Vector2,
-    UI::Composition::{ContainerVisual, Visual},
-};
+use bindings::Windows::{Foundation::Numerics::Vector2, UI::Composition::ContainerVisual};
 
 use crate::FrameTag;
 
@@ -24,14 +21,13 @@ impl AsRef<Vector2> for Size {
 }
 
 pub struct Slot {
-    frame: FrameTag,
     container: ContainerVisual,
 }
 
 impl Slot {
     fn new(frame: FrameTag) -> crate::Result<Self> {
         let container = frame.compositor().CreateContainerVisual()?;
-        Ok(Self { frame, container })
+        Ok(Self { container })
     }
 }
 
@@ -42,9 +38,9 @@ pub struct SlotKeeper {
 
 impl SlotKeeper {
     pub fn new(frame: FrameTag) -> crate::Result<Self> {
-        let panel = Slot::new(frame)?;
-        let container = panel.container.clone();
-        let keeper = Keeper::new(panel);
+        let slot = Slot::new(frame)?;
+        let container = slot.container.clone();
+        let keeper = Keeper::new(slot);
         Ok(Self { keeper, container })
     }
     pub fn tag(&self) -> SlotTag {

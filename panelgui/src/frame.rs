@@ -1,14 +1,14 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use async_object::{EventStream, Keeper, Tag};
+use async_object::{Keeper, Tag};
 use bindings::{
     Microsoft::Graphics::Canvas::{CanvasDevice, UI::Composition::CanvasComposition},
     Windows::{
         Foundation::Numerics::Vector2,
-        UI::Composition::{CompositionGraphicsDevice, Compositor, ContainerVisual, Visual},
+        UI::Composition::{CompositionGraphicsDevice, Compositor, ContainerVisual},
     },
 };
-use futures::{executor::LocalSpawner, task::LocalSpawnExt, Future, Stream, StreamExt};
+use futures::{executor::LocalSpawner, task::LocalSpawnExt, Future};
 
 use crate::slot::{Size, SlotKeeper, SlotTag};
 
@@ -69,11 +69,11 @@ pub struct FrameKeeper {
 }
 impl FrameKeeper {
     pub fn new(spawner: LocalSpawner) -> crate::Result<Self> {
-        let window = Frame::new(spawner)?;
-        let mut tag = window.tag.clone();
-        let keeper = Keeper::new(window);
-        tag.tag = keeper.tag();
-        Ok(Self { keeper, tag })
+        let keeper = Keeper::new(Frame::new(spawner)?);
+        let tag = keeper.get().tag.clone();
+        let keeper = Self { keeper, tag };
+        keeper.get_mut().tag.tag = keeper.keeper.tag();
+        Ok(keeper)
     }
     pub fn tag(&self) -> FrameTag {
         self.tag.clone()
@@ -145,6 +145,12 @@ impl FrameTag {
     }
     pub fn close_slot(&self, slot: SlotTag) -> crate::Result<()> {
         self.tag.call_mut(|frame| frame.close_slot(slot))?
+    }
+}
+
+impl PartialEq for FrameTag {
+    fn eq(&self, other: &Self) -> bool {
+        self.tag == other.tag
     }
 }
 

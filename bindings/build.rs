@@ -10,7 +10,7 @@ fn main() {
             CompositionColorBrush, CompositionContainerShape, CompositionEllipseGeometry,
             CompositionNineGridBrush, CompositionScopedBatch, CompositionShapeCollection,
             CompositionSpriteShape, Compositor, ShapeVisual, SpriteVisual,
-            Vector3KeyFrameAnimation, VisualCollection, ContainerVisual
+            Vector3KeyFrameAnimation, VisualCollection, ContainerVisual, CompositionRoundedRectangleGeometry
         },
         Windows::Win32::Foundation::{
             RECT, BOOL, HINSTANCE, LRESULT, E_FAIL, E_HANDLE, HWND, WPARAM,

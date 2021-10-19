@@ -1,13 +1,14 @@
-// mod background;
+mod background;
 // mod cell;
 mod frame;
 // mod ribbon;
 mod slot;
 
-use async_object::EventStream;
-use bindings::Windows::{Foundation::Numerics::Vector2, UI::Composition::Visual};
 // pub use cell::{Cell, CellKeeper, CellTag};
+pub use background::{Background, BackgroundKeeper, BackgroundTag};
 pub use frame::{Frame, FrameKeeper, FrameTag};
+pub use slot::{Slot, SlotKeeper, SlotTag};
+
 use futures::task::SpawnError;
 // pub use ribbon::{Ribbon, RibbonKeeper, RibbonTag};
 use thiserror::Error;

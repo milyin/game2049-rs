@@ -132,7 +132,7 @@ impl Window {
                     X: new_size.Width as f32,
                     Y: new_size.Height as f32,
                 };
-                self.frame.set_size(new_size);
+                self.frame.set_size(new_size).unwrap();
             }
             WM_LBUTTONDOWN => {
                 // self.game.on_pointer_pressed(false, false).unwrap();

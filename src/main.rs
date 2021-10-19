@@ -10,11 +10,11 @@ use bindings::Windows::{
         System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
         UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG},
     },
-    UI::Composition::Compositor,
+    UI::Colors,
 };
 use futures::executor::LocalPool;
 use interop::create_dispatcher_queue_controller_for_current_thread;
-use panelgui::FrameKeeper;
+use panelgui::{BackgroundKeeper, FrameKeeper};
 use window::Window;
 
 fn run() -> panelgui::Result<()> {
@@ -31,14 +31,16 @@ fn run() -> panelgui::Result<()> {
 
     let mut pool = LocalPool::new();
 
-    let frame = FrameKeeper::new(pool.spawner())?;
-    let frame_tag = frame.tag();
+    let frame_keeper = FrameKeeper::new(pool.spawner())?;
+    let frame = frame_keeper.tag();
 
-    frame.get_mut().set_size(window_size)?;
+    frame.set_size(window_size)?;
+    let slot = frame.open_modal_slot()?;
+    let _background = BackgroundKeeper::new(&frame, slot, Colors::White()?, false)?;
 
-    let window = Window::new("2049-rs", window_width, window_height, frame_tag)?;
-    let target = window.create_window_target(frame.compositor(), false)?;
-    target.SetRoot(frame.root_visual())?;
+    let window = Window::new("2049-rs", window_width, window_height, frame)?;
+    let target = window.create_window_target(frame_keeper.compositor(), false)?;
+    target.SetRoot(frame_keeper.root_visual())?;
 
     let mut message = MSG::default();
     unsafe {
