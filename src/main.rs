@@ -36,7 +36,7 @@ fn run() -> panelgui::Result<()> {
 
     frame.set_size(window_size)?;
     let slot = frame.open_modal_slot()?;
-    let _background = BackgroundKeeper::new(&frame, slot, Colors::White()?, false)?;
+    let _background = BackgroundKeeper::new(&frame, slot, Colors::Red()?, true)?;
 
     let window = Window::new("2049-rs", window_width, window_height, pool, frame)?;
     let target = window.create_window_target(frame_keeper.compositor(), false)?;

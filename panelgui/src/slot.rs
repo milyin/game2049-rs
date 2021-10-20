@@ -5,6 +5,12 @@ use bindings::Windows::{Foundation::Numerics::Vector2, UI::Composition::Containe
 
 use crate::FrameTag;
 
+#[derive(Clone)]
+pub struct RawEvent<T: Clone + Send + Sync>(pub T);
+
+#[derive(Clone)]
+pub struct FocusedEvent<T: Clone + Send + Sync>(pub T);
+
 #[derive(Clone, Debug)]
 pub struct Size(Vector2);
 
@@ -20,14 +26,42 @@ impl AsRef<Vector2> for Size {
     }
 }
 
+impl Into<Vector2> for Size {
+    fn into(self) -> Vector2 {
+        self.0
+    }
+}
+
+impl Into<Vector2> for RawEvent<Size> {
+    fn into(self) -> Vector2 {
+        self.0.into()
+    }
+}
+
+impl Into<Vector2> for FocusedEvent<Size> {
+    fn into(self) -> Vector2 {
+        self.0.into()
+    }
+}
+
 pub struct Slot {
     container: ContainerVisual,
+    focused: bool,
 }
 
 impl Slot {
     fn new(frame: FrameTag) -> crate::Result<Self> {
         let container = frame.compositor().CreateContainerVisual()?;
-        Ok(Self { container })
+        Ok(Self {
+            container,
+            focused: false,
+        })
+    }
+    pub fn set_focused(&mut self, focused: bool) {
+        self.focused = focused
+    }
+    pub fn is_focused(&self) -> bool {
+        self.focused
     }
 }
 
@@ -58,9 +92,15 @@ impl SlotKeeper {
     pub fn container(&self) -> &ContainerVisual {
         &self.container
     }
-    pub fn send_size(&self, size: Size) -> crate::Result<()> {
+    fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T, focused: bool) {
+        self.keeper.send_event(RawEvent(event.clone()));
+        if focused && self.get().is_focused() {
+            self.keeper.send_event(FocusedEvent(event));
+        }
+    }
+    pub fn send_size(&self, size: Size, focused: bool) -> crate::Result<()> {
         self.container().SetSize(size.as_ref())?;
-        self.keeper.send_event(size);
+        self.send_event(size, focused);
         Ok(())
     }
 }
@@ -78,7 +118,10 @@ impl SlotTag {
     pub fn alive(&self) -> EventStream<()> {
         EventStream::new(self.tag.clone())
     }
-    pub fn on_size(&self) -> EventStream<Size> {
+    pub fn on_raw_size(&self) -> EventStream<RawEvent<Size>> {
+        EventStream::new(self.tag.clone())
+    }
+    pub fn on_focused_size(&self) -> EventStream<FocusedEvent<Size>> {
         EventStream::new(self.tag.clone())
     }
 }

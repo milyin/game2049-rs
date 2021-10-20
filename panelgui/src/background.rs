@@ -124,8 +124,9 @@ impl BackgroundKeeper {
     }
     fn spawn_event_handlers(tag: BackgroundTag) -> crate::Result<()> {
         tag.clone().refs.frame.spawn_local(async move {
-            while let Some(size) = tag.refs.slot.on_size().next().await {
-                tag.refs.shape.SetSize(size.as_ref())?;
+            while let Some(size) = tag.refs.slot.on_raw_size().next().await {
+                let size: Vector2 = size.into();
+                tag.refs.shape.SetSize(size)?;
                 tag.refs.redraw_background()?;
             }
             Ok(())
