@@ -1,13 +1,13 @@
-use std::{
-    default,
-    sync::{RwLockReadGuard, RwLockWriteGuard},
-};
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{Keeper, Tag};
 use bindings::Windows::Foundation::Numerics::Vector2;
-use futures::{task::LocalSpawnExt, StreamExt};
+use futures::StreamExt;
 
-use crate::{CellKeeper, CellTag, FrameKeeper, FrameTag};
+use crate::{
+    slot::{FocusedEvent, RawEvent, Size},
+    FrameTag, SlotKeeper, SlotTag,
+};
 
 pub enum Orientation {
     Stack,
@@ -16,80 +16,101 @@ pub enum Orientation {
 }
 
 #[derive(Clone)]
-struct CellHolder {
-    cell: CellKeeper,
-    ratio: f32,
+pub struct RibbonRefs {
+    frame: FrameTag,
+    slot: SlotTag,
 }
 
-impl CellHolder {
-    fn new(window: FrameTag) -> crate::Result<Self> {
-        Ok(Self {
-            cell: CellKeeper::new(window)?,
-            ratio: 1.0,
-        })
+impl RibbonRefs {
+    pub fn new(frame: FrameTag, slot: SlotTag) -> Self {
+        Self { frame, slot }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct CellLimit {
+    pub ratio: f32,
+    pub min_size: f32,
+    pub max_size: Option<f32>,
+}
+
+impl CellLimit {
+    pub fn set_size(&mut self, size: f32) {
+        self.min_size = size;
+        self.max_size = Some(size);
+    }
+}
+
+impl Default for CellLimit {
+    fn default() -> Self {
+        Self {
+            ratio: 1.,
+            min_size: 0.,
+            max_size: None,
+        }
+    }
+}
+
+struct Cell {
+    slot: SlotKeeper,
+    limit: CellLimit,
 }
 
 pub struct Ribbon {
-    window: FrameTag,
+    refs: RibbonRefs,
     orientation: Orientation,
-    cells: Vec<CellHolder>,
+    cells: Vec<Cell>,
 }
 
 impl Ribbon {
-    fn new(window: FrameTag) -> crate::Result<Self> {
-        Ok(Self {
-            window,
-            orientation: Orientation::Horizontal,
+    pub fn new(refs: RibbonRefs, orientation: Orientation) -> Self {
+        Self {
+            refs,
+            orientation,
             cells: Vec::new(),
-        })
+        }
     }
-    pub fn set_size(size: Vector2) -> crate::Result<()> {
-        
-    }
-    pub fn set_sell_count(&mut self, count: usize) -> crate::Result<()> {
-        self.cells
-            .resize(count, CellHolder::new(self.window.clone())?);
+    pub fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T) -> crate::Result<()> {
+        let focused = self.refs.slot.is_focused()?;
+        for cell in &self.cells {
+            cell.slot.send_event(event.clone(), focused)
+        }
         Ok(())
     }
-    pub fn set_cell_ratio(&mut self, index: usize, ratio: f32) -> crate::Result<()> {
-        self.cells
-            .get_mut(index)
-            .map_or(Err(crate::Error::BadIndex), |cell| {
-                cell.ratio = ratio;
-                Ok(())
-            })
+    pub fn send_size_event(&self, event: Size) -> crate::Result<()> {
+        let focused = self.refs.slot.is_focused()?;
+        for cell in &self.cells {
+            cell.slot.send_event(event.clone(), focused)
+        }
+        Ok(())
     }
-    pub fn get_cell(&self, index: usize) -> crate::Result<CellTag> {
-        self.cells
-            .get(index)
-            .map_or(Err(crate::Error::BadIndex), |cell| Ok(cell.cell.tag()))
+
+    pub fn add_cell(&mut self) -> crate::Result<SlotTag> {
+        let slot = SlotKeeper::new(self.refs.frame.clone())?;
+        let limit = CellLimit::default();
+        let slot_tag = slot.tag();
+        self.cells.push(Cell { slot, limit });
+        Ok(slot_tag)
     }
 }
 
-#[derive(Clone)]
 pub struct RibbonKeeper {
     keeper: Keeper<Ribbon>,
+    refs: RibbonRefs,
 }
 
 impl RibbonKeeper {
-    pub fn new(window: FrameTag) -> crate::Result<Self> {
-        let keeper = Keeper::new(Ribbon::new(window)?);
-        let keeper = Self { keeper };
-        let ribbon = keeper.tag();
-
-        let spawner = window.spawner().clone();
-        spawner.spawn_local({
-            let window = window.clone();
-            let ribbon = ribbon.clone();
-            async { while let Some(size) = window.on_size().next().await {} }
-        })?;
-
+    pub fn new(frame: &FrameTag, slot: SlotTag, orientation: Orientation) -> crate::Result<Self> {
+        let refs = RibbonRefs::new(frame.clone(), slot);
+        let keeper = Keeper::new(Ribbon::new(refs.clone(), orientation));
+        let keeper = Self { keeper, refs };
+        Self::spawn_event_handlers(keeper.tag())?;
         Ok(keeper)
     }
     pub fn tag(&self) -> RibbonTag {
         RibbonTag {
             tag: self.keeper.tag(),
+            refs: self.refs.clone(),
         }
     }
     pub fn get(&self) -> RwLockReadGuard<'_, Ribbon> {
@@ -98,23 +119,37 @@ impl RibbonKeeper {
     pub fn get_mut(&self) -> RwLockWriteGuard<'_, Ribbon> {
         self.keeper.get_mut()
     }
+    fn spawn_event_handlers(ribbon_tag: RibbonTag) -> crate::Result<()> {
+        ribbon_tag.clone().refs.frame.spawn_local(async move {
+            while let Some(RawEvent(size)) = ribbon_tag.refs.slot.on_raw_size().next().await {
+                ribbon_tag.send_event(size).await?
+            }
+            Ok(())
+        })
+    }
 }
 
 #[derive(Clone)]
 pub struct RibbonTag {
     tag: Tag<Ribbon>,
+    refs: RibbonRefs,
 }
 
 impl RibbonTag {
-    pub async fn set_sell_count(&mut self, count: usize) -> crate::Result<()> {
-        self.tag.async_call_mut(|v| v.set_sell_count(count)).await?
+    pub async fn send_event<T: Clone + Send + Sync + 'static>(
+        &self,
+        event: T,
+    ) -> crate::Result<()> {
+        self.tag.async_call(|v| v.send_event(event)).await?
     }
-    pub async fn set_cell_ratio(&mut self, index: usize, ratio: f32) -> crate::Result<()> {
-        self.tag
-            .async_call_mut(|v| v.set_cell_ratio(index, ratio))
-            .await?
+
+    pub async fn add_cell(&mut self) -> crate::Result<SlotTag> {
+        self.tag.async_call_mut(|v| v.add_cell()).await?
     }
-    pub async fn get_cell(&self, index: usize) -> crate::Result<CellTag> {
-        self.tag.async_call(|v| v.get_cell(index)).await?
+}
+
+impl PartialEq for RibbonTag {
+    fn eq(&self, other: &Self) -> bool {
+        self.tag == other.tag
     }
 }

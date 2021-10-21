@@ -48,10 +48,10 @@ impl Frame {
             slots: Vec::new(),
         })
     }
-    fn set_size(&mut self, size: Vector2) -> crate::Result<()> {
+    fn on_size(&mut self, size: Vector2) -> crate::Result<()> {
         self.refs.root_visual.SetSize(size)?;
         for slot in &self.slots {
-            slot.send_size(Size::new(size.clone()), true)? // true because frame itself is always focused
+            slot.send_event(Size::new(size.clone()), true); // true because frame itself is always focused
         }
         Ok(())
     }
@@ -66,7 +66,7 @@ impl Frame {
             top.get_mut().set_focused(false);
         }
         slot.get_mut().set_focused(true);
-        slot.send_size(Size::new(self.refs.root_visual.Size()?), true)?;
+        slot.send_event(Size::new(self.refs.root_visual.Size()?), true); // true because frame itself is always focused
         self.slots.push(slot);
         Ok(slot_tag)
     }
@@ -133,7 +133,7 @@ impl FrameTag {
         &self.refs.spawner
     }
     pub fn set_size(&self, size: Vector2) -> crate::Result<()> {
-        self.tag.call_mut(|g| g.set_size(size))?
+        self.tag.call_mut(|g| g.on_size(size))?
     }
     pub fn spawn_local<Fut>(&self, future: Fut) -> crate::Result<()>
     where

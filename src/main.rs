@@ -32,13 +32,22 @@ fn run() -> panelgui::Result<()> {
     let pool = LocalPool::new();
 
     let frame_keeper = FrameKeeper::new(pool.spawner())?;
-    let frame = frame_keeper.tag();
+    let frame_tag = frame_keeper.tag();
 
-    frame.set_size(window_size)?;
-    let slot = frame.open_modal_slot()?;
-    let _background = BackgroundKeeper::new(&frame, slot, Colors::Red()?, true)?;
+    frame_tag.set_size(window_size)?;
 
-    let window = Window::new("2049-rs", window_width, window_height, pool, frame)?;
+    frame_tag.spawn_local({
+        let frame_tag = frame_tag.clone();
+        async move {
+            let slot = frame_tag.open_modal_slot()?;
+            let _background =
+                BackgroundKeeper::new(&frame_tag, slot.clone(), Colors::Red()?, true)?;
+            while let Some(_) = futures::StreamExt::next(&mut slot.alive()).await {}
+            Ok(())
+        }
+    })?;
+
+    let window = Window::new("2049-rs", window_width, window_height, pool, frame_tag)?;
     let target = window.create_window_target(frame_keeper.compositor(), false)?;
     target.SetRoot(frame_keeper.root_visual())?;
 

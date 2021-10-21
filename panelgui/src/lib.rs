@@ -1,12 +1,11 @@
 mod background;
-// mod cell;
 mod frame;
 // mod ribbon;
 mod slot;
 
-// pub use cell::{Cell, CellKeeper, CellTag};
 pub use background::{Background, BackgroundKeeper, BackgroundTag};
 pub use frame::{Frame, FrameKeeper, FrameTag};
+// pub use ribbon::{Ribbon, RibbonKeeper, RibbonTag};
 pub use slot::{Slot, SlotKeeper, SlotTag};
 
 use futures::task::SpawnError;

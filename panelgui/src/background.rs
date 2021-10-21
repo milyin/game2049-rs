@@ -18,44 +18,35 @@ struct BackgroundRefs {
     frame: FrameTag,
     slot: SlotTag,
     shape: ShapeVisual,
-    round_corners: bool,
-    color: Color,
 }
 
 impl BackgroundRefs {
-    fn new(
-        frame: FrameTag,
-        slot: SlotTag,
-        color: Color,
-        round_corners: bool,
-    ) -> crate::Result<Self> {
+    fn new(frame: FrameTag, slot: SlotTag) -> crate::Result<Self> {
         let shape = frame.compositor().CreateShapeVisual()?;
         slot.container().Children()?.InsertAtBottom(shape.clone())?;
-        Ok(Self {
-            frame,
-            slot,
-            shape,
-            color,
-            round_corners,
-        })
+        Ok(Self { frame, slot, shape })
     }
     fn detach(&self) -> crate::Result<()> {
         self.slot.container().Children()?.Remove(&self.shape)?;
         Ok(())
     }
-    fn redraw_background(&self) -> windows::Result<()> {
+    fn redraw_background(&self, round_corners: bool, color: Color) -> windows::Result<()> {
         self.shape.Shapes()?.Clear()?;
         self.shape
             .Shapes()?
-            .Append(self.create_background_shape()?)?;
+            .Append(self.create_background_shape(round_corners, color)?)?;
         Ok(())
     }
-    fn create_background_shape(&self) -> windows::Result<CompositionShape> {
+    fn create_background_shape(
+        &self,
+        round_corners: bool,
+        color: Color,
+    ) -> windows::Result<CompositionShape> {
         let compositor = self.frame.compositor();
         let container_shape = compositor.CreateContainerShape()?;
         let rect_geometry = compositor.CreateRoundedRectangleGeometry()?;
         rect_geometry.SetSize(self.shape.Size()?)?;
-        if self.round_corners {
+        if round_corners {
             let size = rect_geometry.Size()?;
             let radius = std::cmp::min(FloatOrd(size.X), FloatOrd(size.Y)).0 / 20.;
             rect_geometry.SetCornerRadius(Vector2 {
@@ -65,7 +56,7 @@ impl BackgroundRefs {
         } else {
             rect_geometry.SetCornerRadius(Vector2 { X: 0., Y: 0. })?;
         }
-        let brush = compositor.CreateColorBrushWithColor(self.color.clone())?;
+        let brush = compositor.CreateColorBrushWithColor(color.clone())?;
         let rect = compositor.CreateSpriteShapeWithGeometry(rect_geometry)?;
         rect.SetFillBrush(brush)?;
         rect.SetOffset(Vector2 { X: 0., Y: 0. })?;
@@ -77,11 +68,17 @@ impl BackgroundRefs {
 
 pub struct Background {
     refs: BackgroundRefs,
+    round_corners: bool,
+    color: Color,
 }
 
 impl Background {
-    fn new(refs: BackgroundRefs) -> Self {
-        Self { refs }
+    fn new(refs: BackgroundRefs, color: Color, round_corners: bool) -> Self {
+        Self {
+            refs,
+            color,
+            round_corners,
+        }
     }
 }
 
@@ -104,8 +101,8 @@ impl BackgroundKeeper {
         color: Color,
         round_corners: bool,
     ) -> crate::Result<Self> {
-        let refs = BackgroundRefs::new(frame.clone(), slot, color, round_corners)?;
-        let keeper = Keeper::new(Background::new(refs.clone()));
+        let refs = BackgroundRefs::new(frame.clone(), slot)?;
+        let keeper = Keeper::new(Background::new(refs.clone(), color, round_corners));
         let keeper = Self { keeper, refs };
         Self::spawn_event_handlers(keeper.tag())?;
         Ok(keeper)
@@ -127,7 +124,8 @@ impl BackgroundKeeper {
             while let Some(size) = tag.refs.slot.on_raw_size().next().await {
                 let size: Vector2 = size.into();
                 tag.refs.shape.SetSize(size)?;
-                tag.refs.redraw_background()?;
+                tag.refs
+                    .redraw_background(tag.round_corners()?, tag.color()?)?;
             }
             Ok(())
         })
@@ -137,6 +135,15 @@ impl BackgroundKeeper {
 pub struct BackgroundTag {
     tag: Tag<Background>,
     refs: BackgroundRefs,
+}
+
+impl BackgroundTag {
+    fn round_corners(&self) -> crate::Result<bool> {
+        Ok(self.tag.call(|v| v.round_corners)?)
+    }
+    fn color(&self) -> crate::Result<Color> {
+        Ok(self.tag.call(|v| v.color)?)
+    }
 }
 
 impl PartialEq for BackgroundTag {

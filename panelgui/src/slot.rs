@@ -92,13 +92,13 @@ impl SlotKeeper {
     pub fn container(&self) -> &ContainerVisual {
         &self.container
     }
-    fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T, focused: bool) {
+    pub fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T, focused: bool) {
         self.keeper.send_event(RawEvent(event.clone()));
         if focused && self.get().is_focused() {
             self.keeper.send_event(FocusedEvent(event));
         }
     }
-    pub fn send_size(&self, size: Size, focused: bool) -> crate::Result<()> {
+    pub fn set_size(&self, size: Size, focused: bool) -> crate::Result<()> {
         self.container().SetSize(size.as_ref())?;
         self.send_event(size, focused);
         Ok(())
@@ -112,6 +112,9 @@ pub struct SlotTag {
 }
 
 impl SlotTag {
+    pub fn is_focused(&self) -> crate::Result<bool> {
+        Ok(self.tag.call(|v| v.is_focused())?)
+    }
     pub fn container(&self) -> &ContainerVisual {
         &self.container
     }
