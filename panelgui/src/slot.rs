@@ -2,6 +2,7 @@ use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{EventStream, Keeper, Tag};
 use bindings::Windows::{Foundation::Numerics::Vector2, UI::Composition::ContainerVisual};
+use futures::StreamExt;
 
 use crate::FrameTag;
 
@@ -12,37 +13,7 @@ pub struct RawEvent<T: Clone + Send + Sync>(pub T);
 pub struct FocusedEvent<T: Clone + Send + Sync>(pub T);
 
 #[derive(Clone, Debug)]
-pub struct Size(Vector2);
-
-impl Size {
-    pub fn new(size: Vector2) -> Self {
-        Self(size)
-    }
-}
-
-impl AsRef<Vector2> for Size {
-    fn as_ref(&self) -> &Vector2 {
-        &self.0
-    }
-}
-
-impl Into<Vector2> for Size {
-    fn into(self) -> Vector2 {
-        self.0
-    }
-}
-
-impl Into<Vector2> for RawEvent<Size> {
-    fn into(self) -> Vector2 {
-        self.0.into()
-    }
-}
-
-impl Into<Vector2> for FocusedEvent<Size> {
-    fn into(self) -> Vector2 {
-        self.0.into()
-    }
-}
+pub struct Size(pub Vector2);
 
 pub struct Slot {
     container: ContainerVisual,
@@ -98,9 +69,9 @@ impl SlotKeeper {
             self.keeper.send_event(FocusedEvent(event));
         }
     }
-    pub fn set_size(&self, size: Size, focused: bool) -> crate::Result<()> {
-        self.container().SetSize(size.as_ref())?;
-        self.send_event(size, focused);
+    pub fn on_size(&self, size: Vector2, focused: bool) -> crate::Result<()> {
+        self.container().SetSize(size)?;
+        self.send_event(Size(size), focused);
         Ok(())
     }
 }
@@ -118,8 +89,10 @@ impl SlotTag {
     pub fn container(&self) -> &ContainerVisual {
         &self.container
     }
-    pub fn alive(&self) -> EventStream<()> {
-        EventStream::new(self.tag.clone())
+    pub async fn join(&self) -> crate::Result<()> {
+        let mut stream = EventStream::<()>::new(self.tag.clone());
+        while let Some(_) = stream.next().await {}
+        Ok(())
     }
     pub fn on_raw_size(&self) -> EventStream<RawEvent<Size>> {
         EventStream::new(self.tag.clone())

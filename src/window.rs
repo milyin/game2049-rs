@@ -11,7 +11,7 @@ use bindings::Windows::{
             PostQuitMessage, RegisterClassW, ShowWindow, CREATESTRUCTW, CW_USEDEFAULT,
             GWLP_USERDATA, HMENU, IDC_ARROW, SW_SHOW, WINDOW_LONG_PTR_INDEX, WM_DESTROY,
             WM_LBUTTONDOWN, WM_MOUSEMOVE, WM_NCCREATE, WM_RBUTTONDOWN, WM_SIZE, WM_SIZING,
-            WNDCLASSW, WS_EX_NOREDIRECTIONBITMAP, WS_OVERLAPPEDWINDOW,
+            WM_TIMER, WNDCLASSW, WS_EX_NOREDIRECTIONBITMAP, WS_OVERLAPPEDWINDOW,
         },
     },
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
@@ -107,6 +107,10 @@ impl Window {
         self.handle
     }
 
+    pub fn pool(&mut self) -> &mut LocalPool {
+        &mut self.pool
+    }
+
     pub fn create_window_target(
         &self,
         compositor: &Compositor,
@@ -143,6 +147,9 @@ impl Window {
             }
             WM_RBUTTONDOWN => {
                 // self.game.on_pointer_pressed(true, false).unwrap();
+            }
+            WM_TIMER => {
+                dbg!("timer");
             }
             _ => {}
         }

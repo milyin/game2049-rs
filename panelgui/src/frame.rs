@@ -51,24 +51,24 @@ impl Frame {
     fn on_size(&mut self, size: Vector2) -> crate::Result<()> {
         self.refs.root_visual.SetSize(size)?;
         for slot in &self.slots {
-            slot.send_event(Size::new(size.clone()), true); // true because frame itself is always focused
+            slot.send_event(Size(size.clone()), true); // true because frame itself is always focused
         }
         Ok(())
     }
     fn open_slot_modal(&mut self, tag: FrameTag) -> crate::Result<SlotTag> {
-        let slot = SlotKeeper::new(tag)?;
+        let slot_keeper = SlotKeeper::new(tag)?;
         self.refs
             .root_visual
             .Children()?
-            .InsertAtTop(slot.container().clone())?;
-        let slot_tag = slot.tag();
+            .InsertAtTop(slot_keeper.container().clone())?;
+        let slot = slot_keeper.tag();
         if let Some(top) = self.slots.last_mut() {
             top.get_mut().set_focused(false);
         }
-        slot.get_mut().set_focused(true);
-        slot.send_event(Size::new(self.refs.root_visual.Size()?), true); // true because frame itself is always focused
-        self.slots.push(slot);
-        Ok(slot_tag)
+        slot_keeper.get_mut().set_focused(true);
+        slot_keeper.on_size(self.refs.root_visual.Size()?, true)?; // true because frame itself is always focused
+        self.slots.push(slot_keeper);
+        Ok(slot)
     }
     pub fn close_slot(&mut self, slot: SlotTag) -> crate::Result<()> {
         self.refs.root_visual.Children()?.Remove(slot.container())?;

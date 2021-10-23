@@ -1,11 +1,11 @@
 mod background;
 mod frame;
-// mod ribbon;
+mod ribbon;
 mod slot;
 
 pub use background::{Background, BackgroundKeeper, BackgroundTag};
 pub use frame::{Frame, FrameKeeper, FrameTag};
-// pub use ribbon::{Ribbon, RibbonKeeper, RibbonTag};
+pub use ribbon::{Ribbon, RibbonKeeper, RibbonOrientation, RibbonTag};
 pub use slot::{Slot, SlotKeeper, SlotTag};
 
 use futures::task::SpawnError;

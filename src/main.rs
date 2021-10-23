@@ -1,5 +1,8 @@
 #![windows_subsystem = "windows"]
 
+use async_std::task;
+use std::time::Duration;
+
 mod interop;
 mod wide_strings;
 mod window;
@@ -8,13 +11,13 @@ use bindings::Windows::{
     Win32::{
         Foundation::HWND,
         System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
-        UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG},
+        UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, SetTimer, TranslateMessage, MSG},
     },
-    UI::Colors,
+    UI::{Color, Colors},
 };
 use futures::executor::LocalPool;
 use interop::create_dispatcher_queue_controller_for_current_thread;
-use panelgui::{BackgroundKeeper, FrameKeeper};
+use panelgui::{BackgroundKeeper, FrameKeeper, RibbonKeeper, RibbonOrientation};
 use window::Window;
 
 fn run() -> panelgui::Result<()> {
@@ -32,27 +35,47 @@ fn run() -> panelgui::Result<()> {
     let pool = LocalPool::new();
 
     let frame_keeper = FrameKeeper::new(pool.spawner())?;
-    let frame_tag = frame_keeper.tag();
+    let frame = frame_keeper.tag();
 
-    frame_tag.set_size(window_size)?;
+    frame.set_size(window_size)?;
+    let slot = frame.open_modal_slot()?;
+    // let background_keeper = BackgroundKeeper::new(&frame, slot.clone(), Colors::White()?, true)?;
+    let ribbon_keeper = RibbonKeeper::new(&frame, slot, RibbonOrientation::Horizontal)?;
+    let ribbon = ribbon_keeper.tag();
+    let left = ribbon.add_cell()?;
+    let center = ribbon.add_cell()?;
+    let right = ribbon.add_cell()?;
+    let _left_bkg_keeper = BackgroundKeeper::new(&frame, left, Colors::Red()?, true)?;
+    let _center_bkg_keeper = BackgroundKeeper::new(&frame, center, Colors::Green()?, true)?;
+    let _right_bkg_keeper = BackgroundKeeper::new(&frame, right, Colors::Blue()?, true)?;
 
-    frame_tag.spawn_local({
-        let frame_tag = frame_tag.clone();
-        async move {
-            let slot = frame_tag.open_modal_slot()?;
-            let _background =
-                BackgroundKeeper::new(&frame_tag, slot.clone(), Colors::Red()?, true)?;
-            while let Some(_) = futures::StreamExt::next(&mut slot.alive()).await {}
-            Ok(())
-        }
-    })?;
+    // frame.spawn_local({
+    //     let frame_tag = frame.clone();
+    //     async move {
+    //         let slot = frame_tag.open_modal_slot()?;
+    //         task::sleep(Duration::from_secs(5)).await;
+    //         dbg!("show");
+    //         let background_keeper =
+    //             BackgroundKeeper::new(&frame_tag, slot.clone(), Colors::Red()?, true)?;
+    //         dbg!("red");
+    //         let background = background_keeper.tag();
+    //         task::sleep(Duration::from_secs(5)).await;
+    //         background.set_color(Colors::Blue()?)?;
+    //         dbg!("blue");
+    //         // frame_tag.close_slot(slot)?;
+    //         slot.join().await
+    //         // Ok(())
+    //     }
+    // })?;
 
-    let window = Window::new("2049-rs", window_width, window_height, pool, frame_tag)?;
+    let window = Window::new("2049-rs", window_width, window_height, pool, frame)?;
     let target = window.create_window_target(frame_keeper.compositor(), false)?;
     target.SetRoot(frame_keeper.root_visual())?;
 
     let mut message = MSG::default();
     unsafe {
+        const IDT_TIMER1: usize = 1;
+        SetTimer(window.handle(), IDT_TIMER1, 10, None);
         while GetMessageW(&mut message, HWND(0), 0, 0).into() {
             TranslateMessage(&mut message);
             DispatchMessageW(&mut message);

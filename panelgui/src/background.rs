@@ -11,7 +11,10 @@ use bindings::Windows::{
 use float_ord::FloatOrd;
 use futures::StreamExt;
 
-use crate::{FrameTag, SlotTag};
+use crate::{
+    slot::{RawEvent, Size},
+    FrameTag, SlotTag,
+};
 
 #[derive(Clone)]
 struct BackgroundRefs {
@@ -24,6 +27,7 @@ impl BackgroundRefs {
     fn new(frame: FrameTag, slot: SlotTag) -> crate::Result<Self> {
         let shape = frame.compositor().CreateShapeVisual()?;
         slot.container().Children()?.InsertAtBottom(shape.clone())?;
+        shape.SetSize(slot.container().Size()?)?;
         Ok(Self { frame, slot, shape })
     }
     fn detach(&self) -> crate::Result<()> {
@@ -73,12 +77,19 @@ pub struct Background {
 }
 
 impl Background {
-    fn new(refs: BackgroundRefs, color: Color, round_corners: bool) -> Self {
-        Self {
+    fn new(refs: BackgroundRefs, color: Color, round_corners: bool) -> crate::Result<Self> {
+        refs.redraw_background(round_corners, color)?;
+        Ok(Self {
             refs,
             color,
             round_corners,
-        }
+        })
+    }
+    fn set_color(&mut self, color: Color) -> crate::Result<()> {
+        self.color = color;
+        self.refs
+            .redraw_background(self.round_corners, self.color)?;
+        Ok(())
     }
 }
 
@@ -102,7 +113,7 @@ impl BackgroundKeeper {
         round_corners: bool,
     ) -> crate::Result<Self> {
         let refs = BackgroundRefs::new(frame.clone(), slot)?;
-        let keeper = Keeper::new(Background::new(refs.clone(), color, round_corners));
+        let keeper = Keeper::new(Background::new(refs.clone(), color, round_corners)?);
         let keeper = Self { keeper, refs };
         Self::spawn_event_handlers(keeper.tag())?;
         Ok(keeper)
@@ -122,7 +133,7 @@ impl BackgroundKeeper {
     fn spawn_event_handlers(tag: BackgroundTag) -> crate::Result<()> {
         tag.clone().refs.frame.spawn_local(async move {
             while let Some(size) = tag.refs.slot.on_raw_size().next().await {
-                let size: Vector2 = size.into();
+                let RawEvent(Size(size)) = size;
                 tag.refs.shape.SetSize(size)?;
                 tag.refs
                     .redraw_background(tag.round_corners()?, tag.color()?)?;
@@ -138,11 +149,14 @@ pub struct BackgroundTag {
 }
 
 impl BackgroundTag {
-    fn round_corners(&self) -> crate::Result<bool> {
+    pub fn round_corners(&self) -> crate::Result<bool> {
         Ok(self.tag.call(|v| v.round_corners)?)
     }
-    fn color(&self) -> crate::Result<Color> {
+    pub fn color(&self) -> crate::Result<Color> {
         Ok(self.tag.call(|v| v.color)?)
+    }
+    pub fn set_color(&self, color: Color) -> crate::Result<()> {
+        Ok(self.tag.call_mut(|v| v.set_color(color))??)
     }
 }
 
