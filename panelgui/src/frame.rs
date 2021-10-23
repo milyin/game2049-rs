@@ -66,7 +66,7 @@ impl Frame {
             top.get_mut().set_focused(false);
         }
         slot_keeper.get_mut().set_focused(true);
-        slot_keeper.on_size(self.refs.root_visual.Size()?, true)?; // true because frame itself is always focused
+        slot_keeper.on_size(self.refs.root_visual.Size()?, true); // true because frame itself is always focused
         self.slots.push(slot_keeper);
         Ok(slot)
     }
