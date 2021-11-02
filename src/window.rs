@@ -107,6 +107,7 @@ impl Window {
         self.handle
     }
 
+    #[warn(dead_code)]
     pub fn pool(&mut self) -> &mut LocalPool {
         &mut self.pool
     }
@@ -128,7 +129,7 @@ impl Window {
             }
             WM_MOUSEMOVE => {
                 let (x, y) = get_mouse_position(lparam);
-                let point = Vector2 {
+                let _point = Vector2 {
                     X: x as f32,
                     Y: y as f32,
                 };
@@ -140,7 +141,12 @@ impl Window {
                     X: new_size.Width as f32,
                     Y: new_size.Height as f32,
                 };
-                self.frame.set_size(new_size).unwrap();
+                self.frame
+                    .frame_visual()
+                    .unwrap()
+                    .SetSize(new_size)
+                    .unwrap();
+                self.frame.on_size().unwrap();
             }
             WM_LBUTTONDOWN => {
                 // self.game.on_pointer_pressed(false, false).unwrap();

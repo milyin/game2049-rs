@@ -1,31 +1,19 @@
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{Keeper, Tag};
-use bindings::Windows::Foundation::Numerics::{Vector2, Vector3};
+use bindings::Windows::{
+    Foundation::Numerics::{Vector2, Vector3},
+    UI::Composition::ContainerVisual,
+};
 use futures::StreamExt;
 
-use crate::{
-    slot::{FocusedEvent, RawEvent, Size},
-    FrameTag, SlotKeeper, SlotTag,
-};
+use crate::{FrameTag, SlotKeeper, SlotTag};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum RibbonOrientation {
     Stack,
     Horizontal,
     Vertical,
-}
-
-#[derive(Clone)]
-pub struct RibbonRefs {
-    frame: FrameTag,
-    slot: SlotTag,
-}
-
-impl RibbonRefs {
-    pub fn new(frame: FrameTag, slot: SlotTag) -> Self {
-        Self { frame, slot }
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -37,6 +25,15 @@ pub struct CellLimit {
 }
 
 impl CellLimit {
+    pub fn new(ratio: f32, content_ratio: Vector2, min_size: f32, max_size: Option<f32>) -> Self {
+        Self {
+            ratio,
+            content_ratio,
+            min_size,
+            max_size,
+        }
+    }
+
     pub fn set_size(&mut self, size: f32) {
         self.min_size = size;
         self.max_size = Some(size);
@@ -55,54 +52,59 @@ impl Default for CellLimit {
 }
 
 struct Cell {
-    slot: SlotKeeper,
+    slot_keeper: SlotKeeper,
+    container: ContainerVisual,
     limit: CellLimit,
 }
 
 pub struct Ribbon {
-    refs: RibbonRefs,
+    frame: FrameTag,
+    slot: SlotTag,
     orientation: RibbonOrientation,
     cells: Vec<Cell>,
 }
 
 impl Ribbon {
-    pub fn new(refs: RibbonRefs, orientation: RibbonOrientation) -> Self {
+    pub fn new(frame: FrameTag, slot: SlotTag, orientation: RibbonOrientation) -> Self {
         Self {
-            refs,
+            frame,
+            slot,
             orientation,
             cells: Vec::new(),
         }
     }
     pub fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T) -> crate::Result<()> {
-        let focused = self.refs.slot.is_focused()?;
+        let focused = self.slot.is_focused()?;
         for cell in &self.cells {
-            cell.slot.send_event(event.clone(), focused)
+            cell.slot_keeper.send_event(event.clone(), focused)
         }
         Ok(())
     }
-    pub fn on_size(&mut self, size: Vector2) -> crate::Result<()> {
+    pub fn on_size(&mut self) -> crate::Result<()> {
+        let size = self.slot.container()?.Size()?;
         self.resize_cells(size)?;
-        let focused = self.refs.slot.is_focused()?;
+        let focused = self.slot.is_focused()?;
         for cell in &self.cells {
-            cell.slot.on_size(cell.slot.container().Size()?, focused)?
+            cell.slot_keeper.on_size(focused)?
         }
         Ok(())
     }
 
-    pub fn add_cell(&mut self) -> crate::Result<SlotTag> {
-        let slot_keeper = SlotKeeper::new(self.refs.frame.clone())?;
-        let limit = CellLimit::default();
+    pub fn add_cell(&mut self, limit: CellLimit) -> crate::Result<SlotTag> {
+        let compositor = self.frame.compositor()?;
+        let container = compositor.CreateContainerVisual()?;
+        let slot_keeper = SlotKeeper::new(container.clone())?;
         let slot = slot_keeper.tag();
+        self.slot
+            .container()?
+            .Children()?
+            .InsertAtBottom(container.clone())?;
         self.cells.push(Cell {
-            slot: slot_keeper,
+            slot_keeper,
+            container,
             limit,
         });
-        self.refs
-            .slot
-            .container()
-            .Children()?
-            .InsertAtBottom(slot.container().clone())?;
-        self.resize_cells(slot.container().Size()?)?;
+        self.resize_cells(slot.container()?.Size()?)?;
         Ok(slot)
     }
 
@@ -115,8 +117,8 @@ impl Ribbon {
                     Y: (size.Y - content_size.Y) / 2.,
                     Z: 0.,
                 };
-                cell.slot.container().SetSize(&content_size)?;
-                cell.slot.container().SetOffset(&content_offset)?;
+                cell.container.SetSize(&content_size)?;
+                cell.container.SetOffset(&content_offset)?;
             }
         } else {
             let limits = self.cells.iter().map(|c| c.limit).collect::<Vec<_>>();
@@ -137,8 +139,8 @@ impl Ribbon {
                     }
                 };
                 let cell = &mut self.cells[i];
-                cell.slot.container().SetSize(&size)?;
-                cell.slot.container().SetOffset(if hor {
+                cell.container.SetSize(&size)?;
+                cell.container.SetOffset(if hor {
                     Vector3 {
                         X: pos,
                         Y: 0.,
@@ -158,40 +160,34 @@ impl Ribbon {
     }
 }
 
-pub struct RibbonKeeper {
-    keeper: Keeper<Ribbon>,
-    refs: RibbonRefs,
-}
+pub struct RibbonKeeper(Keeper<Ribbon>);
 
 impl RibbonKeeper {
     pub fn new(
-        frame: &FrameTag,
+        frame: FrameTag,
         slot: SlotTag,
         orientation: RibbonOrientation,
     ) -> crate::Result<Self> {
-        let refs = RibbonRefs::new(frame.clone(), slot);
-        let keeper = Keeper::new(Ribbon::new(refs.clone(), orientation));
-        let keeper = Self { keeper, refs };
-        Self::spawn_event_handlers(keeper.tag())?;
+        let keeper = Self(Keeper::new(Ribbon::new(frame, slot, orientation)));
+        keeper.spawn_event_handlers()?;
         Ok(keeper)
     }
     pub fn tag(&self) -> RibbonTag {
-        RibbonTag {
-            tag: self.keeper.tag(),
-            refs: self.refs.clone(),
-        }
+        RibbonTag(self.0.tag())
     }
     pub fn get(&self) -> RwLockReadGuard<'_, Ribbon> {
-        self.keeper.get()
+        self.0.get()
     }
     pub fn get_mut(&self) -> RwLockWriteGuard<'_, Ribbon> {
-        self.keeper.get_mut()
+        self.0.get_mut()
     }
-    fn spawn_event_handlers(ribbon_tag: RibbonTag) -> crate::Result<()> {
-        ribbon_tag.clone().refs.frame.spawn_local(async move {
-            while let Some(event) = ribbon_tag.refs.slot.on_raw_size().next().await {
-                let RawEvent(Size(size)) = event;
-                ribbon_tag.on_size(size)?
+    fn spawn_event_handlers(&self) -> crate::Result<()> {
+        let frame = self.0.get().frame.clone();
+        let slot = self.0.get().slot.clone();
+        let ribbon = self.tag();
+        frame.spawn_local(async move {
+            while let Some(_) = slot.on_raw_size().next().await {
+                ribbon.on_size()?
             }
             Ok(())
         })
@@ -199,7 +195,6 @@ impl RibbonKeeper {
 }
 
 fn adjust_cells(limits: Vec<CellLimit>, mut target: f32) -> Vec<f32> {
-    //dbg!(&target);
     let mut lock = Vec::with_capacity(limits.len());
     let mut result = Vec::with_capacity(limits.len());
     lock.resize(limits.len(), false);
@@ -243,30 +238,20 @@ fn adjust_cells(limits: Vec<CellLimit>, mut target: f32) -> Vec<f32> {
         }
         target = if new_target > 0. { new_target } else { 0. };
     }
-    //dbg!(&result);
     result
 }
 
-#[derive(Clone)]
-pub struct RibbonTag {
-    tag: Tag<Ribbon>,
-    refs: RibbonRefs,
-}
+#[derive(Clone, PartialEq)]
+pub struct RibbonTag(Tag<Ribbon>);
 
 impl RibbonTag {
     pub fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T) -> crate::Result<()> {
-        self.tag.call(|v| v.send_event(event))?
+        self.0.call(|v| v.send_event(event))?
     }
-    pub fn on_size(&self, size: Vector2) -> crate::Result<()> {
-        Ok(self.tag.call_mut(|v| v.on_size(size))??)
+    pub fn on_size(&self) -> crate::Result<()> {
+        self.0.call_mut(|v| v.on_size())?
     }
-    pub fn add_cell(&self) -> crate::Result<SlotTag> {
-        self.tag.call_mut(|v| v.add_cell())?
-    }
-}
-
-impl PartialEq for RibbonTag {
-    fn eq(&self, other: &Self) -> bool {
-        self.tag == other.tag
+    pub fn add_cell(&self, limit: CellLimit) -> crate::Result<SlotTag> {
+        self.0.call_mut(|v| v.add_cell(limit))?
     }
 }

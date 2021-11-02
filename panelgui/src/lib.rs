@@ -6,7 +6,7 @@ mod slot;
 
 pub use background::{Background, BackgroundKeeper, BackgroundTag};
 pub use frame::{Frame, FrameKeeper, FrameTag};
-pub use ribbon::{Ribbon, RibbonKeeper, RibbonOrientation, RibbonTag};
+pub use ribbon::{CellLimit, Ribbon, RibbonKeeper, RibbonOrientation, RibbonTag};
 pub use slot::{Slot, SlotKeeper, SlotTag};
 // pub use text::{Text, TextKeeper, TextTag};
 
@@ -44,3 +44,5 @@ impl From<SpawnError> for Error {
         Error::Spawn(e)
     }
 }
+#[derive(Clone)]
+pub struct SizeEvent;

@@ -1,11 +1,11 @@
 #![windows_subsystem = "windows"]
 
-use async_std::task;
-use std::time::Duration;
+// use std::time::Duration;
 
 mod interop;
 mod wide_strings;
 mod window;
+use bindings::Windows::UI::Color;
 use bindings::Windows::{
     Foundation::Numerics::Vector2,
     Win32::{
@@ -13,11 +13,11 @@ use bindings::Windows::{
         System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
         UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, SetTimer, TranslateMessage, MSG},
     },
-    UI::{Color, Colors},
+    UI::Colors,
 };
 use futures::executor::LocalPool;
 use interop::create_dispatcher_queue_controller_for_current_thread;
-use panelgui::{BackgroundKeeper, FrameKeeper, RibbonKeeper, RibbonOrientation};
+use panelgui::{BackgroundKeeper, CellLimit, FrameKeeper, RibbonKeeper, RibbonOrientation};
 use window::Window;
 
 fn run() -> panelgui::Result<()> {
@@ -36,18 +36,18 @@ fn run() -> panelgui::Result<()> {
 
     let frame_keeper = FrameKeeper::new(pool.spawner())?;
     let frame = frame_keeper.tag();
+    frame.frame_visual()?.SetSize(window_size)?;
 
-    frame.set_size(window_size)?;
-    let slot = frame.open_modal_slot()?;
+    let slot = frame.open_slot()?;
     // let background_keeper = BackgroundKeeper::new(&frame, slot.clone(), Colors::White()?, true)?;
-    let ribbon_keeper = RibbonKeeper::new(&frame, slot, RibbonOrientation::Horizontal)?;
+    let ribbon_keeper = RibbonKeeper::new(frame.clone(), slot, RibbonOrientation::Horizontal)?;
     let ribbon = ribbon_keeper.tag();
-    let left = ribbon.add_cell()?;
-    let center = ribbon.add_cell()?;
-    let right = ribbon.add_cell()?;
-    let _left_bkg_keeper = BackgroundKeeper::new(&frame, left, Colors::Red()?, true)?;
-    let _center_bkg_keeper = BackgroundKeeper::new(&frame, center, Colors::Green()?, true)?;
-    let _right_bkg_keeper = BackgroundKeeper::new(&frame, right, Colors::Blue()?, true)?;
+    let left = ribbon.add_cell(CellLimit::default())?;
+    let center = ribbon.add_cell(CellLimit::new(2.0, Vector2 { X: 1.0, Y: 1.0 }, 300., None))?;
+    let right = ribbon.add_cell(CellLimit::default())?;
+    let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, true)?;
+    let _center_bkg_keeper = BackgroundKeeper::new(frame.clone(), center, Colors::Green()?, true)?;
+    let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, true)?;
 
     // frame.spawn_local({
     //     let frame_tag = frame.clone();
@@ -68,9 +68,9 @@ fn run() -> panelgui::Result<()> {
     //     }
     // })?;
 
-    let window = Window::new("2049-rs", window_width, window_height, pool, frame)?;
-    let target = window.create_window_target(frame_keeper.compositor(), false)?;
-    target.SetRoot(frame_keeper.root_visual())?;
+    let window = Window::new("2049-rs", window_width, window_height, pool, frame.clone())?;
+    let target = window.create_window_target(&frame.compositor()?, false)?;
+    target.SetRoot(frame.frame_visual()?)?;
 
     let mut message = MSG::default();
     unsafe {
