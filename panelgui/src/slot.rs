@@ -4,7 +4,8 @@ use async_object::{EventStream, Keeper, Tag};
 use bindings::Windows::UI::Composition::ContainerVisual;
 use futures::StreamExt;
 
-use crate::SizeEvent;
+#[derive(Clone)]
+pub struct SizeEvent;
 
 #[derive(Clone)]
 pub struct RawEvent<T: Clone + Send + Sync>(pub T);

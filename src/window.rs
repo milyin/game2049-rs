@@ -107,7 +107,7 @@ impl Window {
         self.handle
     }
 
-    #[warn(dead_code)]
+    #[allow(dead_code)]
     pub fn pool(&mut self) -> &mut LocalPool {
         &mut self.pool
     }

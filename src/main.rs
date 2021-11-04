@@ -5,7 +5,10 @@
 mod interop;
 mod wide_strings;
 mod window;
-use bindings::Windows::UI::Color;
+use std::time::Duration;
+
+use async_std::task;
+
 use bindings::Windows::{
     Foundation::Numerics::Vector2,
     Win32::{
@@ -39,34 +42,33 @@ fn run() -> panelgui::Result<()> {
     frame.frame_visual()?.SetSize(window_size)?;
 
     let slot = frame.open_slot()?;
-    // let background_keeper = BackgroundKeeper::new(&frame, slot.clone(), Colors::White()?, true)?;
+    let _background_keeper =
+        BackgroundKeeper::new(frame.clone(), slot.clone(), Colors::White()?, false)?;
     let ribbon_keeper = RibbonKeeper::new(frame.clone(), slot, RibbonOrientation::Horizontal)?;
     let ribbon = ribbon_keeper.tag();
     let left = ribbon.add_cell(CellLimit::default())?;
     let center = ribbon.add_cell(CellLimit::new(2.0, Vector2 { X: 1.0, Y: 1.0 }, 300., None))?;
     let right = ribbon.add_cell(CellLimit::default())?;
-    let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, true)?;
+    let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, false)?;
     let _center_bkg_keeper = BackgroundKeeper::new(frame.clone(), center, Colors::Green()?, true)?;
-    let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, true)?;
+    let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, false)?;
 
-    // frame.spawn_local({
-    //     let frame_tag = frame.clone();
-    //     async move {
-    //         let slot = frame_tag.open_modal_slot()?;
-    //         task::sleep(Duration::from_secs(5)).await;
-    //         dbg!("show");
-    //         let background_keeper =
-    //             BackgroundKeeper::new(&frame_tag, slot.clone(), Colors::Red()?, true)?;
-    //         dbg!("red");
-    //         let background = background_keeper.tag();
-    //         task::sleep(Duration::from_secs(5)).await;
-    //         background.set_color(Colors::Blue()?)?;
-    //         dbg!("blue");
-    //         // frame_tag.close_slot(slot)?;
-    //         slot.join().await
-    //         // Ok(())
-    //     }
-    // })?;
+    frame.spawn_local({
+        let frame = frame.clone();
+        async move {
+            let slot = frame.open_slot()?;
+            task::sleep(Duration::from_secs(5)).await;
+            let background_keeper =
+                BackgroundKeeper::new(frame.clone(), slot.clone(), Colors::Orange()?, true)?;
+            let background = background_keeper.tag();
+            task::sleep(Duration::from_secs(5)).await;
+            background.set_color(Colors::Yellow()?)?;
+            task::sleep(Duration::from_secs(5)).await;
+            frame.close_slot(slot)?;
+            // slot.wait_for_destroy().await
+            Ok(())
+        }
+    })?;
 
     let window = Window::new("2049-rs", window_width, window_height, pool, frame.clone())?;
     let target = window.create_window_target(&frame.compositor()?, false)?;

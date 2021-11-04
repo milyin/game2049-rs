@@ -19,7 +19,7 @@ struct TextRefs {
 impl TextRefs {
     fn new(frame: FrameTag, slot: SlotTag) -> crate::Result<Self> {
         let shape = frame.compositor().CreateShapeVisual()?;
-        slot.container().Children()?.InsertAtBottom(shape.clone())?;
+        slot.container().Children()?.InsertAtTop(shape.clone())?;
         shape.SetSize(slot.container().Size()?)?;
         Ok(Self { frame, slot, shape })
     }

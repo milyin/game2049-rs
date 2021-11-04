@@ -98,7 +98,7 @@ impl Ribbon {
         self.slot
             .container()?
             .Children()?
-            .InsertAtBottom(container.clone())?;
+            .InsertAtTop(container.clone())?;
         self.cells.push(Cell {
             slot_keeper,
             container,

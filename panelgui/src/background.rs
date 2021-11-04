@@ -31,7 +31,7 @@ impl Background {
         let compositor = frame.compositor()?;
         let shape = compositor.CreateShapeVisual()?;
         let container = slot.container()?;
-        container.Children()?.InsertAtBottom(shape.clone())?;
+        container.Children()?.InsertAtTop(shape.clone())?;
         shape.SetSize(container.Size()?)?;
         let background = Self {
             frame,
