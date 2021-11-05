@@ -3,12 +3,14 @@ mod frame;
 mod ribbon;
 mod slot;
 // mod text;
+mod slot_event;
 
 pub use background::{Background, BackgroundKeeper, BackgroundTag};
 pub use frame::{Frame, FrameKeeper, FrameTag};
 pub use ribbon::{CellLimit, Ribbon, RibbonKeeper, RibbonOrientation, RibbonTag};
-pub use slot::{SizeEvent, Slot, SlotKeeper, SlotTag};
+pub use slot::{Slot, SlotKeeper, SlotTag};
 // pub use text::{Text, TextKeeper, TextTag};
+pub use slot_event::{ReceiveSlotEvent, SendSlotEvent, SlotSize};
 
 use futures::task::SpawnError;
 // pub use ribbon::{Ribbon, RibbonKeeper, RibbonTag};

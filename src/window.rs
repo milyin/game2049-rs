@@ -17,7 +17,7 @@ use bindings::Windows::{
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
 };
 use futures::executor::LocalPool;
-use panelgui::FrameTag;
+use panelgui::{SendSlotEvent, SlotSize};
 use windows::{Handle, Interface};
 
 use crate::wide_strings::ToWide;
@@ -27,7 +27,7 @@ static WINDOW_CLASS_NAME: &str = "game2049-rs.Window";
 
 pub struct Window {
     handle: HWND,
-    frame: FrameTag,
+    event_dst: Box<dyn SendSlotEvent>,
     pool: LocalPool,
 }
 
@@ -37,7 +37,7 @@ impl Window {
         width: u32,
         height: u32,
         pool: LocalPool,
-        frame: FrameTag,
+        event_dst: impl SendSlotEvent + 'static,
     ) -> windows::Result<Box<Self>> {
         let class_name = WINDOW_CLASS_NAME.to_wide();
         let instance = unsafe { GetModuleHandleW(PWSTR(std::ptr::null_mut())).ok()? };
@@ -69,10 +69,10 @@ impl Window {
             }
             (rect.right - rect.left, rect.bottom - rect.top)
         };
-
+        let event_dst = Box::new(event_dst);
         let mut result = Box::new(Self {
             handle: HWND(0),
-            frame,
+            event_dst,
             pool,
         });
 
@@ -141,12 +141,7 @@ impl Window {
                     X: new_size.Width as f32,
                     Y: new_size.Height as f32,
                 };
-                self.frame
-                    .frame_visual()
-                    .unwrap()
-                    .SetSize(new_size)
-                    .unwrap();
-                self.frame.on_size().unwrap();
+                self.event_dst.send_size(SlotSize(new_size)).unwrap();
             }
             WM_LBUTTONDOWN => {
                 // self.game.on_pointer_pressed(false, false).unwrap();

@@ -6,7 +6,8 @@ use futures::{executor::LocalSpawner, task::LocalSpawnExt, Future};
 
 use crate::{
     slot::{SlotKeeper, SlotTag},
-    SizeEvent,
+    slot_event::SendSlotEvent,
+    SlotSize,
 };
 
 pub struct FrameShared {
@@ -42,18 +43,11 @@ impl Frame {
     fn frame_visual(&self) -> ContainerVisual {
         self.shared.read().unwrap().frame_visual.clone()
     }
-    fn on_size(&mut self) -> crate::Result<()> {
-        let size = self.frame_visual().Size()?;
-        for slot in &self.slots {
-            slot.container()?.SetSize(size)?;
-            slot.send_event(SizeEvent, true); // true because frame itself is always focused
-        }
-        Ok(())
-    }
 
     fn open_slot(&mut self) -> crate::Result<SlotTag> {
         let compositor = self.compositor();
         let container = compositor.CreateContainerVisual()?;
+        container.SetSize(self.frame_visual().Size()?)?;
         self.shared
             .read()
             .unwrap()
@@ -66,23 +60,32 @@ impl Frame {
             top.get_mut().set_focused(false);
         }
         slot_keeper.get_mut().set_focused(true);
-        slot_keeper.on_size(true)?; // true because frame itself is always focused
         self.slots.push(slot_keeper);
         Ok(slot)
     }
 
     pub fn close_slot(&mut self, slot: SlotTag) -> crate::Result<()> {
-        self.shared
-            .read()
-            .unwrap()
-            .frame_visual
-            .Children()?
-            .Remove(slot.container()?)?;
         if let Some(index) = self.slots.iter().position(|v| v.tag() == slot) {
-            self.slots.remove(index);
+            let slot = self.slots.remove(index);
+            self.shared
+                .read()
+                .unwrap()
+                .frame_visual
+                .Children()?
+                .Remove(slot.container()?)?;
         }
         if let Some(top) = self.slots.last_mut() {
             top.get_mut().set_focused(true);
+        }
+        Ok(())
+    }
+}
+
+impl SendSlotEvent for Frame {
+    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
+        self.frame_visual().SetSize(size.0)?;
+        for slot in &self.slots {
+            slot.send_size(size.clone())?;
         }
         Ok(())
     }
@@ -137,7 +140,13 @@ impl FrameTag {
     pub fn close_slot(&self, slot: SlotTag) -> crate::Result<()> {
         self.0.call_mut(|frame| frame.close_slot(slot))?
     }
-    pub fn on_size(&self) -> crate::Result<()> {
-        self.0.call_mut(|frame| frame.on_size())?
+    // pub fn on_size(&self) -> crate::Result<()> {
+    //     self.0.call_mut(|frame| frame.on_size())?
+    // }
+}
+
+impl SendSlotEvent for FrameTag {
+    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
+        self.0.call_mut(|frame| frame.send_size(size))?
     }
 }

@@ -11,11 +11,11 @@ use bindings::Windows::{
 use float_ord::FloatOrd;
 use futures::StreamExt;
 
-use crate::{FrameTag, SlotTag};
+use crate::{slot::SlotPlug, FrameTag, ReceiveSlotEvent, SlotTag};
 
 pub struct Background {
     frame: FrameTag,
-    slot: SlotTag,
+    slot: SlotPlug,
     shape: ShapeVisual,
     round_corners: bool,
     color: Color,
@@ -30,9 +30,7 @@ impl Background {
     ) -> crate::Result<Self> {
         let compositor = frame.compositor()?;
         let shape = compositor.CreateShapeVisual()?;
-        let container = slot.container()?;
-        container.Children()?.InsertAtTop(shape.clone())?;
-        shape.SetSize(container.Size()?)?;
+        let slot = slot.plug(shape.clone().into())?;
         let background = Self {
             frame,
             slot,
@@ -43,10 +41,6 @@ impl Background {
         background.redraw()?;
         Ok(background)
     }
-    fn detach(&self) -> crate::Result<()> {
-        self.slot.container()?.Children()?.Remove(&self.shape)?;
-        Ok(())
-    }
 
     fn set_color(&mut self, color: Color) -> crate::Result<()> {
         self.color = color;
@@ -54,8 +48,8 @@ impl Background {
         Ok(())
     }
 
-    fn on_size(&mut self) -> crate::Result<()> {
-        self.shape.SetSize(self.slot.container()?.Size()?)?;
+    fn set_size(&mut self, size: Vector2) -> crate::Result<()> {
+        self.shape.SetSize(size)?;
         self.redraw()?;
         Ok(())
     }
@@ -92,12 +86,6 @@ impl Background {
     }
 }
 
-impl Drop for Background {
-    fn drop(&mut self) {
-        let _ = self.detach();
-    }
-}
-
 #[derive(Clone)]
 pub struct BackgroundKeeper(Keeper<Background>);
 
@@ -125,10 +113,10 @@ impl BackgroundKeeper {
     fn spawn_event_handlers(&self) -> crate::Result<()> {
         let tag = self.tag();
         let frame = self.get().frame.clone();
-        let slot = self.get().slot.clone();
+        let slot = self.get().slot.tag();
         frame.spawn_local(async move {
-            while let Some(_) = slot.on_raw_size().next().await {
-                tag.on_size()?;
+            while let Some(size) = slot.on_size().next().await {
+                tag.set_size(size.0)?;
             }
             Ok(())
         })
@@ -147,7 +135,7 @@ impl BackgroundTag {
     pub fn set_color(&self, color: Color) -> crate::Result<()> {
         Ok(self.0.call_mut(|v| v.set_color(color))??)
     }
-    pub fn on_size(&self) -> crate::Result<()> {
-        Ok(self.0.call_mut(|v| v.on_size())??)
+    pub fn set_size(&self, size: Vector2) -> crate::Result<()> {
+        Ok(self.0.call_mut(|v| v.set_size(size))??)
     }
 }

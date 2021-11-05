@@ -49,9 +49,9 @@ fn run() -> panelgui::Result<()> {
     let left = ribbon.add_cell(CellLimit::default())?;
     let center = ribbon.add_cell(CellLimit::new(2.0, Vector2 { X: 1.0, Y: 1.0 }, 300., None))?;
     let right = ribbon.add_cell(CellLimit::default())?;
-    let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, false)?;
+    let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, true)?;
     let _center_bkg_keeper = BackgroundKeeper::new(frame.clone(), center, Colors::Green()?, true)?;
-    let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, false)?;
+    let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, true)?;
 
     frame.spawn_local({
         let frame = frame.clone();

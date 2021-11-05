@@ -1,21 +1,14 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{EventStream, Keeper, Tag};
-use bindings::Windows::UI::Composition::ContainerVisual;
+use bindings::Windows::UI::Composition::{ContainerVisual, Visual};
 use futures::StreamExt;
 
-#[derive(Clone)]
-pub struct SizeEvent;
+use crate::slot_event::{ReceiveSlotEvent, SendSlotEvent, SlotSize};
 
 #[derive(Clone)]
-pub struct RawEvent<T: Clone + Send + Sync>(pub T);
-
-#[derive(Clone)]
-pub struct FocusedEvent<T: Clone + Send + Sync>(pub T);
-
-#[derive(Clone, Debug)]
-
 pub struct Slot {
+    tag: SlotTag,
     container: ContainerVisual,
     focused: bool,
 }
@@ -23,6 +16,7 @@ pub struct Slot {
 impl Slot {
     fn new(container: ContainerVisual) -> crate::Result<Self> {
         Ok(Self {
+            tag: SlotTag::default(),
             container,
             focused: false,
         })
@@ -33,8 +27,38 @@ impl Slot {
     pub fn is_focused(&self) -> bool {
         self.focused
     }
-    pub fn container(&self) -> ContainerVisual {
-        self.container.clone()
+    pub fn plug(&mut self, visual: Visual) -> crate::Result<SlotPlug> {
+        visual.SetSize(self.container.Size()?)?;
+        self.container.Children()?.InsertAtTop(visual.clone())?;
+        Ok(SlotPlug {
+            tag: self.tag.clone(),
+            container: self.container.clone(),
+            visual,
+        })
+    }
+}
+
+pub struct SlotPlug {
+    tag: SlotTag,
+    container: ContainerVisual,
+    visual: Visual,
+}
+
+impl SlotPlug {
+    pub fn tag(&self) -> SlotTag {
+        self.tag.clone()
+    }
+}
+
+impl From<SlotPlug> for SlotTag {
+    fn from(plug: SlotPlug) -> Self {
+        plug.tag()
+    }
+}
+
+impl Drop for SlotPlug {
+    fn drop(&mut self) {
+        let _ = self.container.Children().map(|c| c.Remove(&self.visual));
     }
 }
 
@@ -43,16 +67,15 @@ pub struct SlotKeeper(Keeper<Slot, ContainerVisual>);
 impl SlotKeeper {
     pub fn new(container: ContainerVisual) -> crate::Result<Self> {
         let slot = Slot::new(container.clone())?;
-        Ok(Self(Keeper::new_with_shared(
+        let keeper = Self(Keeper::new_with_shared(
             slot,
             Arc::new(RwLock::new(container)),
-        )))
+        ));
+        keeper.get_mut().tag = keeper.tag();
+        Ok(keeper)
     }
     pub fn tag(&self) -> SlotTag {
         SlotTag(self.0.tag())
-    }
-    pub fn container(&self) -> crate::Result<ContainerVisual> {
-        Ok(self.0.clone_shared())
     }
     pub fn get(&self) -> RwLockReadGuard<'_, Slot> {
         self.0.get()
@@ -60,19 +83,20 @@ impl SlotKeeper {
     pub fn get_mut(&self) -> RwLockWriteGuard<'_, Slot> {
         self.0.get_mut()
     }
-    pub fn send_event<T: Clone + Send + Sync + 'static>(&self, event: T, parent_focused: bool) {
-        self.0.send_event(RawEvent(event.clone()));
-        if parent_focused && self.get().is_focused() {
-            self.0.send_event(FocusedEvent(event));
-        }
+    pub fn container(&self) -> crate::Result<ContainerVisual> {
+        Ok(self.0.clone_shared())
     }
-    pub fn on_size(&self, parent_focused: bool) -> crate::Result<()> {
-        self.send_event(SizeEvent, parent_focused);
+}
+
+impl SendSlotEvent for SlotKeeper {
+    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
+        self.container()?.SetSize(size.0)?;
+        self.0.send_event(size);
         Ok(())
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct SlotTag(Tag<Slot, ContainerVisual>);
 
 impl SlotTag {
@@ -84,13 +108,13 @@ impl SlotTag {
         while let Some(_) = stream.next().await {}
         Ok(())
     }
-    pub fn on_raw_size(&self) -> EventStream<RawEvent<SizeEvent>> {
-        EventStream::new(self.0.clone())
+    pub fn plug(&self, visual: Visual) -> crate::Result<SlotPlug> {
+        Ok(self.0.call_mut(|v| v.plug(visual))??)
     }
-    pub fn on_focused_size(&self) -> EventStream<FocusedEvent<SizeEvent>> {
+}
+
+impl ReceiveSlotEvent for SlotTag {
+    fn on_size(&self) -> EventStream<SlotSize> {
         EventStream::new(self.0.clone())
-    }
-    pub fn container(&self) -> crate::Result<ContainerVisual> {
-        Ok(self.0.clone_shared()?)
     }
 }
