@@ -6,7 +6,7 @@ use futures::{executor::LocalSpawner, task::LocalSpawnExt, Future};
 
 use crate::{
     slot::{SlotKeeper, SlotTag},
-    slot_event::SendSlotEvent,
+    slot_event::{MouseLeftPressed, MouseLeftPressedFocused, SendSlotEvent},
     SlotSize,
 };
 
@@ -56,10 +56,6 @@ impl Frame {
             .InsertAtTop(container.clone())?;
         let slot_keeper = SlotKeeper::new(container)?;
         let slot = slot_keeper.tag();
-        if let Some(top) = self.slots.last_mut() {
-            top.get_mut().set_focused(false);
-        }
-        slot_keeper.get_mut().set_focused(true);
         self.slots.push(slot_keeper);
         Ok(slot)
     }
@@ -74,18 +70,32 @@ impl Frame {
                 .Children()?
                 .Remove(slot.container()?)?;
         }
-        if let Some(top) = self.slots.last_mut() {
-            top.get_mut().set_focused(true);
-        }
         Ok(())
     }
 }
 
 impl SendSlotEvent for Frame {
-    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
+    fn send_size(&mut self, size: SlotSize) -> crate::Result<()> {
         self.frame_visual().SetSize(size.0)?;
-        for slot in &self.slots {
+        for slot in &mut self.slots {
             slot.send_size(size.clone())?;
+        }
+        Ok(())
+    }
+
+    fn send_mouse_left_pressed(&mut self, event: MouseLeftPressed) -> crate::Result<()> {
+        for slot in &mut self.slots {
+            slot.send_mouse_left_pressed(event.clone())?;
+        }
+        Ok(())
+    }
+
+    fn send_mouse_left_pressed_focused(
+        &mut self,
+        event: MouseLeftPressedFocused,
+    ) -> crate::Result<()> {
+        if let Some(slot) = self.slots.last_mut() {
+            slot.send_mouse_left_pressed_focused(event)?;
         }
         Ok(())
     }
@@ -146,7 +156,20 @@ impl FrameTag {
 }
 
 impl SendSlotEvent for FrameTag {
-    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
+    fn send_size(&mut self, size: SlotSize) -> crate::Result<()> {
         self.0.call_mut(|frame| frame.send_size(size))?
+    }
+
+    fn send_mouse_left_pressed(&mut self, event: MouseLeftPressed) -> crate::Result<()> {
+        self.0
+            .call_mut(|frame| frame.send_mouse_left_pressed(event))?
+    }
+
+    fn send_mouse_left_pressed_focused(
+        &mut self,
+        event: MouseLeftPressedFocused,
+    ) -> crate::Result<()> {
+        self.0
+            .call_mut(|frame| frame.send_mouse_left_pressed_focused(event))?
     }
 }

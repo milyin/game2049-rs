@@ -10,7 +10,9 @@ pub use frame::{Frame, FrameKeeper, FrameTag};
 pub use ribbon::{CellLimit, Ribbon, RibbonKeeper, RibbonOrientation, RibbonTag};
 pub use slot::{Slot, SlotKeeper, SlotTag};
 // pub use text::{Text, TextKeeper, TextTag};
-pub use slot_event::{ReceiveSlotEvent, SendSlotEvent, SlotSize};
+pub use slot_event::{
+    MouseLeftPressed, MouseLeftPressedFocused, ReceiveSlotEvent, SendSlotEvent, SlotSize,
+};
 
 use futures::task::SpawnError;
 // pub use ribbon::{Ribbon, RibbonKeeper, RibbonTag};

@@ -17,7 +17,7 @@ use bindings::Windows::{
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
 };
 use futures::executor::LocalPool;
-use panelgui::{SendSlotEvent, SlotSize};
+use panelgui::{MouseLeftPressed, MouseLeftPressedFocused, SendSlotEvent, SlotSize};
 use windows::{Handle, Interface};
 
 use crate::wide_strings::ToWide;
@@ -29,6 +29,7 @@ pub struct Window {
     handle: HWND,
     event_dst: Box<dyn SendSlotEvent>,
     pool: LocalPool,
+    mouse_pos: Vector2,
 }
 
 impl Window {
@@ -70,10 +71,12 @@ impl Window {
             (rect.right - rect.left, rect.bottom - rect.top)
         };
         let event_dst = Box::new(event_dst);
+        let mouse_pos = Vector2::default();
         let mut result = Box::new(Self {
             handle: HWND(0),
             event_dst,
             pool,
+            mouse_pos,
         });
 
         let title = title.to_wide();
@@ -129,10 +132,11 @@ impl Window {
             }
             WM_MOUSEMOVE => {
                 let (x, y) = get_mouse_position(lparam);
-                let _point = Vector2 {
+                let point = Vector2 {
                     X: x as f32,
                     Y: y as f32,
                 };
+                self.mouse_pos = point;
                 // self.game.on_pointer_moved(&point).unwrap();
             }
             WM_SIZE | WM_SIZING => {
@@ -144,7 +148,12 @@ impl Window {
                 self.event_dst.send_size(SlotSize(new_size)).unwrap();
             }
             WM_LBUTTONDOWN => {
-                // self.game.on_pointer_pressed(false, false).unwrap();
+                self.event_dst
+                    .send_mouse_left_pressed(MouseLeftPressed(self.mouse_pos))
+                    .unwrap();
+                self.event_dst
+                    .send_mouse_left_pressed_focused(MouseLeftPressedFocused(self.mouse_pos))
+                    .unwrap();
             }
             WM_RBUTTONDOWN => {
                 // self.game.on_pointer_pressed(true, false).unwrap();

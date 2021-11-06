@@ -8,7 +8,9 @@ use bindings::Windows::{
 use futures::StreamExt;
 
 use crate::{
-    slot::SlotPlug, FrameTag, ReceiveSlotEvent, SendSlotEvent, SlotKeeper, SlotSize, SlotTag,
+    slot::SlotPlug,
+    slot_event::{MouseLeftPressed, MouseLeftPressedFocused},
+    FrameTag, ReceiveSlotEvent, SendSlotEvent, SlotKeeper, SlotSize, SlotTag,
 };
 
 #[derive(PartialEq, Clone, Copy)]
@@ -57,6 +59,19 @@ struct Cell {
     slot_keeper: SlotKeeper,
     container: ContainerVisual,
     limit: CellLimit,
+}
+
+impl Cell {
+    fn translate_point(&self, mut point: Vector2) -> crate::Result<Vector2> {
+        let offset = self.container.Offset()?;
+        point.X -= offset.X;
+        point.Y -= offset.Y;
+        Ok(point)
+    }
+    fn is_translated_point_in_cell(&self, point: Vector2) -> crate::Result<bool> {
+        let size = self.container.Size()?;
+        Ok(point.X >= 0. && point.X < size.X && point.Y >= 0. && point.Y < size.Y)
+    }
 }
 
 pub struct Ribbon {
@@ -149,12 +164,38 @@ impl Ribbon {
         }
         Ok(())
     }
+}
 
-    fn send_size(&mut self, size: SlotSize) -> crate::Result<()> {
-        self.resize_cells(size.0)?;
-        for cell in &self.cells {
+impl SendSlotEvent for Ribbon {
+    fn send_size(&mut self, event: SlotSize) -> crate::Result<()> {
+        self.resize_cells(event.0)?;
+        for cell in &mut self.cells {
             cell.slot_keeper
                 .send_size(SlotSize(cell.container.Size()?))?
+        }
+        Ok(())
+    }
+
+    fn send_mouse_left_pressed(&mut self, event: MouseLeftPressed) -> crate::Result<()> {
+        for cell in &mut self.cells {
+            let point = cell.translate_point(event.0)?;
+            cell.slot_keeper
+                .send_mouse_left_pressed(MouseLeftPressed(point))?
+        }
+        Ok(())
+    }
+
+    fn send_mouse_left_pressed_focused(
+        &mut self,
+        event: MouseLeftPressedFocused,
+    ) -> crate::Result<()> {
+        for cell in &mut self.cells {
+            let point = cell.translate_point(event.0)?;
+            if cell.is_translated_point_in_cell(point)? {
+                return cell
+                    .slot_keeper
+                    .send_mouse_left_pressed_focused(MouseLeftPressedFocused(point));
+            }
         }
         Ok(())
     }
@@ -185,12 +226,27 @@ impl RibbonKeeper {
         let frame = self.0.get().frame.clone();
         let slot = self.0.get().slot.tag();
         let ribbon = self.tag();
-        frame.spawn_local(async move {
-            while let Some(size) = slot.on_size().next().await {
-                ribbon.send_size(size)?
-            }
-            Ok(())
-        })
+        {
+            let slot = slot.clone();
+            let mut ribbon = ribbon.clone();
+            frame.spawn_local(async move {
+                while let Some(size) = slot.on_size().next().await {
+                    ribbon.send_size(size)?
+                }
+                Ok(())
+            })?;
+        }
+        {
+            let slot = slot.clone();
+            let mut ribbon = ribbon.clone();
+            frame.spawn_local(async move {
+                while let Some(event) = slot.on_mouse_left_pressed().next().await {
+                    ribbon.send_mouse_left_pressed(event)?
+                }
+                Ok(())
+            })?;
+        }
+        Ok(())
     }
 }
 
@@ -254,7 +310,19 @@ impl RibbonTag {
 }
 
 impl SendSlotEvent for RibbonTag {
-    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
-        self.0.call_mut(|v| v.send_size(size))?
+    fn send_size(&mut self, event: SlotSize) -> crate::Result<()> {
+        self.0.call_mut(|v| v.send_size(event))?
+    }
+
+    fn send_mouse_left_pressed(&mut self, event: MouseLeftPressed) -> crate::Result<()> {
+        self.0.call_mut(|v| v.send_mouse_left_pressed(event))?
+    }
+
+    fn send_mouse_left_pressed_focused(
+        &mut self,
+        event: MouseLeftPressedFocused,
+    ) -> crate::Result<()> {
+        self.0
+            .call_mut(|v| v.send_mouse_left_pressed_focused(event))?
     }
 }

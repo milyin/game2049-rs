@@ -4,13 +4,14 @@ use async_object::{EventStream, Keeper, Tag};
 use bindings::Windows::UI::Composition::{ContainerVisual, Visual};
 use futures::StreamExt;
 
-use crate::slot_event::{ReceiveSlotEvent, SendSlotEvent, SlotSize};
+use crate::slot_event::{
+    MouseLeftPressed, MouseLeftPressedFocused, ReceiveSlotEvent, SendSlotEvent, SlotSize,
+};
 
 #[derive(Clone)]
 pub struct Slot {
     tag: SlotTag,
     container: ContainerVisual,
-    focused: bool,
 }
 
 impl Slot {
@@ -18,14 +19,7 @@ impl Slot {
         Ok(Self {
             tag: SlotTag::default(),
             container,
-            focused: false,
         })
-    }
-    pub fn set_focused(&mut self, focused: bool) {
-        self.focused = focused
-    }
-    pub fn is_focused(&self) -> bool {
-        self.focused
     }
     pub fn plug(&mut self, visual: Visual) -> crate::Result<SlotPlug> {
         visual.SetSize(self.container.Size()?)?;
@@ -89,9 +83,20 @@ impl SlotKeeper {
 }
 
 impl SendSlotEvent for SlotKeeper {
-    fn send_size(&self, size: SlotSize) -> crate::Result<()> {
-        self.container()?.SetSize(size.0)?;
-        self.0.send_event(size);
+    fn send_size(&mut self, event: SlotSize) -> crate::Result<()> {
+        self.container()?.SetSize(event.0)?;
+        self.0.send_event(event);
+        Ok(())
+    }
+    fn send_mouse_left_pressed(&mut self, event: MouseLeftPressed) -> crate::Result<()> {
+        self.0.send_event(event);
+        Ok(())
+    }
+    fn send_mouse_left_pressed_focused(
+        &mut self,
+        event: MouseLeftPressedFocused,
+    ) -> crate::Result<()> {
+        self.0.send_event(event);
         Ok(())
     }
 }
@@ -100,9 +105,6 @@ impl SendSlotEvent for SlotKeeper {
 pub struct SlotTag(Tag<Slot, ContainerVisual>);
 
 impl SlotTag {
-    pub fn is_focused(&self) -> crate::Result<bool> {
-        Ok(self.0.call(|v| v.is_focused())?)
-    }
     pub async fn wait_for_destroy(&self) -> crate::Result<()> {
         let mut stream = EventStream::<()>::new(self.0.clone());
         while let Some(_) = stream.next().await {}
@@ -115,6 +117,14 @@ impl SlotTag {
 
 impl ReceiveSlotEvent for SlotTag {
     fn on_size(&self) -> EventStream<SlotSize> {
+        EventStream::new(self.0.clone())
+    }
+
+    fn on_mouse_left_pressed(&self) -> EventStream<MouseLeftPressed> {
+        EventStream::new(self.0.clone())
+    }
+
+    fn on_mouse_left_pressed_focused(&self) -> EventStream<MouseLeftPressedFocused> {
         EventStream::new(self.0.clone())
     }
 }

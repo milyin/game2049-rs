@@ -18,9 +18,11 @@ use bindings::Windows::{
     },
     UI::Colors,
 };
-use futures::executor::LocalPool;
+use futures::{executor::LocalPool, StreamExt};
 use interop::create_dispatcher_queue_controller_for_current_thread;
-use panelgui::{BackgroundKeeper, CellLimit, FrameKeeper, RibbonKeeper, RibbonOrientation};
+use panelgui::{
+    BackgroundKeeper, CellLimit, FrameKeeper, ReceiveSlotEvent, RibbonKeeper, RibbonOrientation,
+};
 use window::Window;
 
 fn run() -> panelgui::Result<()> {
@@ -50,8 +52,10 @@ fn run() -> panelgui::Result<()> {
     let center = ribbon.add_cell(CellLimit::new(2.0, Vector2 { X: 1.0, Y: 1.0 }, 300., None))?;
     let right = ribbon.add_cell(CellLimit::default())?;
     let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, true)?;
-    let _center_bkg_keeper = BackgroundKeeper::new(frame.clone(), center, Colors::Green()?, true)?;
+    let center_bkg_keeper =
+        BackgroundKeeper::new(frame.clone(), center.clone(), Colors::Green()?, true)?;
     let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, true)?;
+    let center_bkg = center_bkg_keeper.tag();
 
     frame.spawn_local({
         let frame = frame.clone();
@@ -66,6 +70,16 @@ fn run() -> panelgui::Result<()> {
             task::sleep(Duration::from_secs(5)).await;
             frame.close_slot(slot)?;
             // slot.wait_for_destroy().await
+            Ok(())
+        }
+    })?;
+
+    frame.spawn_local({
+        let center = center.clone();
+        async move {
+            while let Some(_) = center.on_mouse_left_pressed().next().await {
+                center_bkg.set_color(Colors::Black()?)?
+            }
             Ok(())
         }
     })?;
