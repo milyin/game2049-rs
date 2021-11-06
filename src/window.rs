@@ -159,7 +159,7 @@ impl Window {
                 // self.game.on_pointer_pressed(true, false).unwrap();
             }
             WM_TIMER => {
-                dbg!("timer");
+                // dbg!("timer");
             }
             _ => {}
         }

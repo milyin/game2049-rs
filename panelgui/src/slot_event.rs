@@ -1,13 +1,13 @@
 use async_object::EventStream;
 use bindings::Windows::Foundation::Numerics::Vector2;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SlotSize(pub Vector2);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MouseLeftPressed(pub Vector2);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MouseLeftPressedFocused(pub Vector2);
 
 pub trait SendSlotEvent {

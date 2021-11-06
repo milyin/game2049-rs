@@ -150,9 +150,6 @@ impl FrameTag {
     pub fn close_slot(&self, slot: SlotTag) -> crate::Result<()> {
         self.0.call_mut(|frame| frame.close_slot(slot))?
     }
-    // pub fn on_size(&self) -> crate::Result<()> {
-    //     self.0.call_mut(|frame| frame.on_size())?
-    // }
 }
 
 impl SendSlotEvent for FrameTag {

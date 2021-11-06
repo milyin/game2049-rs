@@ -10,13 +10,13 @@ use std::time::Duration;
 use async_std::task;
 
 use bindings::Windows::{
-    Foundation::Numerics::Vector2,
+    Foundation::Numerics::{Vector2, Vector3},
     Win32::{
         Foundation::HWND,
         System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
         UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, SetTimer, TranslateMessage, MSG},
     },
-    UI::Colors,
+    UI::{Color, Colors},
 };
 use futures::{executor::LocalPool, StreamExt};
 use interop::create_dispatcher_queue_controller_for_current_thread;
@@ -43,42 +43,69 @@ fn run() -> panelgui::Result<()> {
     let frame = frame_keeper.tag();
     frame.frame_visual()?.SetSize(window_size)?;
 
-    let slot = frame.open_slot()?;
+    let frame_slot = frame.open_slot()?;
     let _background_keeper =
-        BackgroundKeeper::new(frame.clone(), slot.clone(), Colors::White()?, false)?;
-    let ribbon_keeper = RibbonKeeper::new(frame.clone(), slot, RibbonOrientation::Horizontal)?;
+        BackgroundKeeper::new(frame.clone(), frame_slot.clone(), Colors::White()?, false)?;
+    let ribbon_keeper = RibbonKeeper::new(
+        frame.clone(),
+        frame_slot.clone(),
+        RibbonOrientation::Horizontal,
+    )?;
     let ribbon = ribbon_keeper.tag();
     let left = ribbon.add_cell(CellLimit::default())?;
     let center = ribbon.add_cell(CellLimit::new(2.0, Vector2 { X: 1.0, Y: 1.0 }, 300., None))?;
     let right = ribbon.add_cell(CellLimit::default())?;
     let _left_bkg_keeper = BackgroundKeeper::new(frame.clone(), left, Colors::Red()?, true)?;
-    let center_bkg_keeper =
+    let _center_bkg_keeper =
         BackgroundKeeper::new(frame.clone(), center.clone(), Colors::Green()?, true)?;
     let _right_bkg_keeper = BackgroundKeeper::new(frame.clone(), right, Colors::Blue()?, true)?;
-    let center_bkg = center_bkg_keeper.tag();
+
+    // frame.spawn_local({
+    //     let frame = frame.clone();
+    //     async move {
+    //         let slot = frame.open_slot()?;
+    //         task::sleep(Duration::from_secs(5)).await;
+    //         let background_keeper =
+    //             BackgroundKeeper::new(frame.clone(), slot.clone(), Colors::Orange()?, true)?;
+    //         let background = background_keeper.tag();
+    //         task::sleep(Duration::from_secs(5)).await;
+    //         background.set_color(Colors::Yellow()?)?;
+    //         task::sleep(Duration::from_secs(5)).await;
+    //         frame.close_slot(slot)?;
+    //         // slot.wait_for_destroy().await
+    //         Ok(())
+    //     }
+    // })?;
 
     frame.spawn_local({
+        let compositor = frame.compositor()?;
         let frame = frame.clone();
+        let slot = frame_slot.clone();
         async move {
-            let slot = frame.open_slot()?;
-            task::sleep(Duration::from_secs(5)).await;
-            let background_keeper =
-                BackgroundKeeper::new(frame.clone(), slot.clone(), Colors::Orange()?, true)?;
-            let background = background_keeper.tag();
-            task::sleep(Duration::from_secs(5)).await;
-            background.set_color(Colors::Yellow()?)?;
-            task::sleep(Duration::from_secs(5)).await;
-            frame.close_slot(slot)?;
-            // slot.wait_for_destroy().await
-            Ok(())
-        }
-    })?;
-
-    frame.spawn_local({
-        let center = center.clone();
-        async move {
-            while let Some(_) = center.on_mouse_left_pressed().next().await {
-                center_bkg.set_color(Colors::Black()?)?
+            while let Some(event) = slot.on_mouse_left_pressed().next().await {
+                let compositor = compositor.clone();
+                let frame_visual = frame.frame_visual()?;
+                frame.spawn_local(async move {
+                    let visual = compositor.CreateShapeVisual()?;
+                    dbg!(&event);
+                    let geometry = compositor.CreateEllipseGeometry()?;
+                    geometry.SetRadius(Vector2 { X: 10., Y: 10. })?;
+                    geometry.SetCenter(Vector2 { X: 10., Y: 10. })?;
+                    let brush = compositor.CreateColorBrushWithColor(Colors::Yellow()?)?;
+                    let sprite = compositor.CreateSpriteShapeWithGeometry(geometry)?;
+                    sprite.SetFillBrush(brush)?;
+                    visual.Shapes()?.Append(sprite)?;
+                    visual.SetOffset(Vector3 {
+                        X: event.0.X - 10.,
+                        Y: event.0.Y - 10.,
+                        Z: 0.,
+                    })?;
+                    visual.SetSize(Vector2 { X: 20., Y: 20. })?;
+                    frame_visual.Children()?.InsertAtTop(visual.clone())?;
+                    task::sleep(Duration::from_secs(5)).await;
+                    frame_visual.Children()?.Remove(visual)?;
+                    Ok(())
+                })?;
             }
             Ok(())
         }
