@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use async_object::{Keeper, Tag};
 use bindings::Windows::UI::Composition::{Compositor, ContainerVisual};
-use futures::{executor::LocalSpawner, task::LocalSpawnExt, Future};
+use futures::{executor::ThreadPool, Future};
 
 use crate::{
     slot::{SlotKeeper, SlotTag},
@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub struct FrameShared {
-    spawner: LocalSpawner,
+    thread_pool: ThreadPool,
     compositor: Compositor,
     frame_visual: ContainerVisual,
 }
@@ -21,11 +21,11 @@ pub struct Frame {
 }
 
 impl Frame {
-    fn new(spawner: LocalSpawner) -> crate::Result<Self> {
+    fn new(thread_pool: ThreadPool) -> crate::Result<Self> {
         let compositor = Compositor::new()?;
         let frame_visual = compositor.CreateContainerVisual()?;
         let shared = Arc::new(RwLock::new(FrameShared {
-            spawner,
+            thread_pool,
             compositor,
             frame_visual,
         }));
@@ -105,8 +105,8 @@ impl SendSlotEvent for Frame {
 pub struct FrameKeeper(Keeper<Frame, FrameShared>);
 
 impl FrameKeeper {
-    pub fn new(spawner: LocalSpawner) -> crate::Result<Self> {
-        let frame = Frame::new(spawner)?;
+    pub fn new(thread_pool: ThreadPool) -> crate::Result<Self> {
+        let frame = Frame::new(thread_pool)?;
         let shared = frame.shared();
         let keeper = Keeper::new_with_shared(frame, shared);
         Ok(Self(keeper))
@@ -132,16 +132,16 @@ impl FrameTag {
     pub fn frame_visual(&self) -> crate::Result<ContainerVisual> {
         Ok(self.0.read_shared(|v| v.frame_visual.clone())?)
     }
-    pub fn spawner(&self) -> crate::Result<LocalSpawner> {
-        Ok(self.0.read_shared(|v| v.spawner.clone())?)
+    pub fn thread_pool(&self) -> crate::Result<ThreadPool> {
+        Ok(self.0.read_shared(|v| v.thread_pool.clone())?)
     }
-    pub fn spawn_local<Fut>(&self, future: Fut) -> crate::Result<()>
+    pub fn thread_spawn<Fut>(&self, future: Fut) -> crate::Result<()>
     where
-        Fut: Future<Output = crate::Result<()>> + 'static,
+        Fut: Future<Output = crate::Result<()>> + Send + 'static,
     {
-        self.spawner()?.spawn_local(async {
+        self.thread_pool()?.spawn_ok(async {
             future.await.unwrap() // TODO: store error somethere (thread_local? special inrerface in tag?)
-        })?;
+        });
         Ok(())
     }
     pub fn open_slot(&self) -> crate::Result<SlotTag> {

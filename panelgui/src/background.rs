@@ -114,7 +114,7 @@ impl BackgroundKeeper {
         let tag = self.tag();
         let frame = self.get().frame.clone();
         let slot = self.get().slot.tag();
-        frame.spawn_local(async move {
+        frame.thread_spawn(async move {
             while let Some(size) = slot.on_size().next().await {
                 tag.set_size(size.0)?;
             }

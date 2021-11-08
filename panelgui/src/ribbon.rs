@@ -229,7 +229,7 @@ impl RibbonKeeper {
         {
             let slot = slot.clone();
             let mut ribbon = ribbon.clone();
-            frame.spawn_local(async move {
+            frame.thread_spawn(async move {
                 while let Some(size) = slot.on_size().next().await {
                     ribbon.send_size(size)?
                 }
@@ -239,7 +239,7 @@ impl RibbonKeeper {
         {
             let slot = slot.clone();
             let mut ribbon = ribbon.clone();
-            frame.spawn_local(async move {
+            frame.thread_spawn(async move {
                 while let Some(event) = slot.on_mouse_left_pressed().next().await {
                     ribbon.send_mouse_left_pressed(event)?
                 }

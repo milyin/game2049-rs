@@ -16,7 +16,7 @@ use bindings::Windows::{
     },
     UI::Composition::{Compositor, Desktop::DesktopWindowTarget},
 };
-use futures::executor::LocalPool;
+
 use panelgui::{MouseLeftPressed, MouseLeftPressedFocused, SendSlotEvent, SlotSize};
 use windows::{Handle, Interface};
 
@@ -28,7 +28,7 @@ static WINDOW_CLASS_NAME: &str = "game2049-rs.Window";
 pub struct Window {
     handle: HWND,
     event_dst: Box<dyn SendSlotEvent>,
-    pool: LocalPool,
+    // pool: LocalPool,
     mouse_pos: Vector2,
 }
 
@@ -37,7 +37,7 @@ impl Window {
         title: &str,
         width: u32,
         height: u32,
-        pool: LocalPool,
+        // pool: LocalPool,
         event_dst: impl SendSlotEvent + 'static,
     ) -> windows::Result<Box<Self>> {
         let class_name = WINDOW_CLASS_NAME.to_wide();
@@ -75,7 +75,7 @@ impl Window {
         let mut result = Box::new(Self {
             handle: HWND(0),
             event_dst,
-            pool,
+            // pool,
             mouse_pos,
         });
 
@@ -108,11 +108,6 @@ impl Window {
 
     pub fn handle(&self) -> HWND {
         self.handle
-    }
-
-    #[allow(dead_code)]
-    pub fn pool(&mut self) -> &mut LocalPool {
-        &mut self.pool
     }
 
     pub fn create_window_target(
@@ -163,7 +158,7 @@ impl Window {
             }
             _ => {}
         }
-        self.pool.run_until_stalled();
+        // self.pool.run_until_stalled();
         unsafe { DefWindowProcW(self.handle, message, wparam, lparam) }
     }
 

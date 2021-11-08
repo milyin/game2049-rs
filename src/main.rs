@@ -14,11 +14,11 @@ use bindings::Windows::{
     Win32::{
         Foundation::HWND,
         System::WinRT::{RoInitialize, RO_INIT_SINGLETHREADED},
-        UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, SetTimer, TranslateMessage, MSG},
+        UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG},
     },
-    UI::{Color, Colors},
+    UI::Colors,
 };
-use futures::{executor::LocalPool, StreamExt};
+use futures::{executor::ThreadPool, StreamExt};
 use interop::create_dispatcher_queue_controller_for_current_thread;
 use panelgui::{
     BackgroundKeeper, CellLimit, FrameKeeper, ReceiveSlotEvent, RibbonKeeper, RibbonOrientation,
@@ -37,9 +37,10 @@ fn run() -> panelgui::Result<()> {
         Y: window_height as f32,
     };
 
-    let pool = LocalPool::new();
+    // let local_pool = LocalPool::new();
+    let thread_pool = ThreadPool::builder().create().unwrap();
 
-    let frame_keeper = FrameKeeper::new(pool.spawner())?;
+    let frame_keeper = FrameKeeper::new(thread_pool.clone())?;
     let frame = frame_keeper.tag();
     frame.frame_visual()?.SetSize(window_size)?;
 
@@ -77,7 +78,7 @@ fn run() -> panelgui::Result<()> {
     //     }
     // })?;
 
-    frame.spawn_local({
+    frame.thread_spawn({
         let compositor = frame.compositor()?;
         let frame = frame.clone();
         let slot = frame_slot.clone();
@@ -85,9 +86,8 @@ fn run() -> panelgui::Result<()> {
             while let Some(event) = slot.on_mouse_left_pressed().next().await {
                 let compositor = compositor.clone();
                 let frame_visual = frame.frame_visual()?;
-                frame.spawn_local(async move {
+                frame.thread_spawn(async move {
                     let visual = compositor.CreateShapeVisual()?;
-                    dbg!(&event);
                     let geometry = compositor.CreateEllipseGeometry()?;
                     geometry.SetRadius(Vector2 { X: 10., Y: 10. })?;
                     geometry.SetCenter(Vector2 { X: 10., Y: 10. })?;
@@ -111,14 +111,20 @@ fn run() -> panelgui::Result<()> {
         }
     })?;
 
-    let window = Window::new("2049-rs", window_width, window_height, pool, frame.clone())?;
+    let window = Window::new(
+        "2049-rs",
+        window_width,
+        window_height,
+        // local_pool,
+        frame.clone(),
+    )?;
     let target = window.create_window_target(&frame.compositor()?, false)?;
     target.SetRoot(frame.frame_visual()?)?;
 
     let mut message = MSG::default();
     unsafe {
-        const IDT_TIMER1: usize = 1;
-        SetTimer(window.handle(), IDT_TIMER1, 10, None);
+        // const IDT_TIMER1: usize = 1;
+        // SetTimer(window.handle(), IDT_TIMER1, 10, None);
         while GetMessageW(&mut message, HWND(0), 0, 0).into() {
             TranslateMessage(&mut message);
             DispatchMessageW(&mut message);
